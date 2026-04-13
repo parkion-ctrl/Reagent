@@ -18,10 +18,14 @@
         <div class="filter-item" style="max-width: 180px; min-width: 180px;">
             <label class="form-label custom-label">파트</label>
             <select name="part" class="form-select custom-input">
+                {% if is_dlab %}
                 <option value="">전체</option>
                 {% for code, name in part_map.items() %}
                 <option value="{{ code }}" {% if part == code %}selected{% endif %}>{{ code }} ({{ name }})</option>
                 {% endfor %}
+                {% else %}
+                <option value="ZZ" selected>ZZ (기타)</option>
+                {% endif %}
             </select>
         </div>
 

@@ -58,8 +58,20 @@
             <div class="topbar-login-strip">
                 <span class="topbar-login-label">접속 중인 ID</span>
                 <span class="topbar-login-name">{{ request.user.username }}</span>
-                <span class="topbar-login-label">부서</span>
-                <span class="topbar-login-name">진단검사의학과</span>
+                <span class="topbar-login-label">접속 중인 부서</span>
+                {% if is_superuser_session %}
+                <select class="topbar-login-name dept-select" id="deptSelect"
+                        onchange="switchDept(this.value)">
+                    {% for dept_name in superuser_dept_list %}
+                    <option value="{{ dept_name }}"
+                            {% if dept_name == user_department %}selected{% endif %}>
+                        {{ dept_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <span class="topbar-login-name">{{ user_department }}</span>
+                {% endif %}
                 <div class="topbar-login-spacer"></div>
                 <a href="/logout/" class="topbar-logout-btn">로그아웃</a>
             </div>
@@ -110,7 +122,13 @@ document.addEventListener("DOMContentLoaded", function () {
             this.classList.toggle("expanded");
         });
     });
+
 });
+
+function switchDept(dept) {
+    var next = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = "/set-dept/?dept=" + encodeURIComponent(dept) + "&next=" + next;
+}
 </script>
 </body>
 </html>

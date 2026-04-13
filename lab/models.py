@@ -49,9 +49,19 @@ class TransactionHistory(models.Model):
         db_table = "transaction_history"
 
 
+DEPARTMENT_CHOICES = [
+    ("진단검사의학과", "진단검사의학과"),
+    ("병리과", "병리과"),
+    ("핵의학과", "핵의학과"),
+    ("유해물질", "유해물질"),
+]
+
+
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     employee_no = models.CharField(max_length=50, blank=True, default="")
+    part = models.CharField(max_length=10, blank=True, default="")
+    department = models.CharField(max_length=50, blank=True, default="")
 
     class Meta:
         db_table = "user_profile"

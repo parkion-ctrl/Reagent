@@ -58,6 +58,19 @@ def can_access_admin_area(user):
     return user.groups.filter(name__in=["관리자", "개발자"]).exists()
 
 
+def _is_dlab(request):
+    """현재 활성 스키마가 진단검사의학과(dlab)인지 여부."""
+    from app.core.db import get_current_schema
+    return get_current_schema() == "dlab"
+
+
+def _get_part(request):
+    """파트 파라미터를 반환한다. 진검 외 부서는 ZZ로 강제."""
+    if _is_dlab(request):
+        return request.GET.get("part", "")
+    return "ZZ"
+
+
 @csrf_exempt
 def login_page(request):
     error = ""
@@ -91,6 +104,21 @@ def logout_view(request):
 
 
 @login_required
+def set_dept_view(request):
+    """슈퍼유저 전용: 세션의 활성 부서를 전환합니다."""
+    if not request.user.is_superuser:
+        return redirect(request.GET.get("next", "/inventory/"))
+    dept = request.GET.get("dept", "")
+    from app.utils.constants import DEPT_SCHEMA_MAP
+    if dept in DEPT_SCHEMA_MAP:
+        request.session["superuser_active_dept"] = dept
+    else:
+        request.session.pop("superuser_active_dept", None)
+    next_url = request.GET.get("next", "/inventory/")
+    return redirect(next_url)
+
+
+@login_required
 @user_passes_test(can_access_admin_area)
 def admin_panel(request):
     from datetime import date, timedelta
@@ -115,19 +143,36 @@ def admin_panel(request):
 @login_required
 @user_passes_test(can_access_admin_area)
 def admin_users(request):
+    from lab.models import DEPARTMENT_CHOICES
+    is_superadmin = request.user.is_superuser or request.user.groups.filter(name="개발자").exists()
+
+    my_profile = UserProfile.objects.filter(user=request.user).first()
+    my_department = my_profile.department if my_profile else ""
+
+    # 개발자/superuser만 부서 전환 가능, 나머지는 자기 부서 고정
+    if is_superadmin:
+        selected_department = request.GET.get("department", my_department).strip()
+    else:
+        selected_department = my_department
+
     q = request.GET.get("q", "").strip()
+    selected_part = request.GET.get("part", "").strip()
     users = User.objects.select_related("profile").all().order_by("username")
+
+    if selected_department:
+        users = users.filter(profile__department=selected_department)
     if q:
         users = users.filter(
             Q(username__icontains=q)
-            | Q(email__icontains=q)
             | Q(first_name__icontains=q)
             | Q(last_name__icontains=q)
             | Q(profile__employee_no__icontains=q)
-        )
-        users = users.distinct().order_by("username")
+        ).distinct().order_by("username")
+    if selected_part:
+        users = users.filter(profile__part=selected_part)
+
     profile_map = {
-        profile.user_id: profile.employee_no
+        profile.user_id: profile
         for profile in UserProfile.objects.filter(user_id__in=[user.id for user in users])
     }
     users_data = []
@@ -139,10 +184,14 @@ def admin_users(request):
             role_labels = ["시스템 관리자"]
         else:
             role_labels = ["그룹 없음"]
+        profile = profile_map.get(user.id)
+        part_code = profile.part if profile else ""
         users_data.append(
             {
                 "user": user,
-                "employee_no": profile_map.get(user.id, ""),
+                "employee_no": profile.employee_no if profile else "",
+                "part": f"{part_code} ({PART_MAP[part_code]})" if part_code and part_code in PART_MAP else part_code,
+                "department": profile.department if profile else "",
                 "group_names": group_names,
                 "role_labels": role_labels,
             }
@@ -154,6 +203,11 @@ def admin_users(request):
             "active_menu": "admin_panel",
             "users": users_data,
             "q": q,
+            "selected_part": selected_part,
+            "selected_department": selected_department,
+            "part_map": PART_MAP,
+            "department_choices": [c[0] for c in DEPARTMENT_CHOICES],
+            "is_superadmin": is_superadmin,
         },
     )
 
@@ -179,6 +233,8 @@ def admin_user_form(request, user_id=None):
     if request.method == "POST":
         username = request.POST.get("username", "").strip()
         employee_no = request.POST.get("employee_no", "").strip()
+        part = request.POST.get("part", "").strip()
+        department = request.POST.get("department", "").strip()
         first_name = request.POST.get("first_name", "").strip()
         last_name = request.POST.get("last_name", "").strip()
         password = request.POST.get("password", "")
@@ -189,6 +245,14 @@ def admin_user_form(request, user_id=None):
             errors.append("아이디를 입력해 주세요.")
         if user_obj is None and not password:
             errors.append("새 사용자에게는 비밀번호가 필요합니다.")
+        is_developer = selected_group_id and Group.objects.filter(id=selected_group_id, name="개발자").exists()
+        if not is_developer:
+            if not selected_group_id:
+                errors.append("권한 그룹을 선택해 주세요.")
+            if not department:
+                errors.append("부서를 선택해 주세요.")
+            if not part:
+                errors.append("파트를 선택해 주세요.")
 
         if not errors:
             target = user_obj or User()
@@ -215,15 +279,22 @@ def admin_user_form(request, user_id=None):
                 target.groups.clear()
             profile, _ = UserProfile.objects.get_or_create(user=target)
             profile.employee_no = employee_no
+            profile.part = part
+            profile.department = department
             profile.save()
             return redirect("/admin-users/?message=저장되었습니다.")
 
+    profile_obj = UserProfile.objects.filter(user_id=user_obj.id).first() if user_obj else None
     context = {
         "active_menu": "admin_panel",
         "user_obj": user_obj,
-        "profile_employee_no": UserProfile.objects.filter(user_id=user_obj.id).values_list("employee_no", flat=True).first() if user_obj else "",
+        "profile_employee_no": profile_obj.employee_no if profile_obj else "",
+        "profile_part": profile_obj.part if profile_obj else "",
+        "profile_department": profile_obj.department if profile_obj else "",
         "groups": role_groups,
         "selected_group_id": selected_group_id,
+        "part_map": PART_MAP,
+        "department_choices": ["진단검사의학과", "병리과", "핵의학과", "유해물질"],
         "errors": errors,
     }
     return render(request, "admin_user_form.html", context)
@@ -328,7 +399,7 @@ def get_master_base_context():
 
 @login_required
 def inventory_page(request):
-    part = request.GET.get("part", "")
+    part = _get_part(request)
     q = request.GET.get("q", "")
     reagent_type = request.GET.get("reagent_type", "")
     equipment = request.GET.get("equipment", "")
@@ -368,7 +439,7 @@ def inventory_page(request):
 
 @login_required
 def master_page(request):
-    part = request.GET.get("part", "")
+    part = _get_part(request)
     q = request.GET.get("q", "")
     sort = request.GET.get("sort", "")
     order = request.GET.get("order", "")
@@ -594,7 +665,7 @@ def upload_master_confirm(request):
 @login_required
 def inbound_page(request):
     q = request.GET.get("q", "")
-    part = request.GET.get("part", "")
+    part = _get_part(request)
     sort = request.GET.get("sort", "")
     order = request.GET.get("order", "")
     context = {
@@ -756,7 +827,7 @@ def inbound_upload_confirm(request):
 @login_required
 def outbound_page(request):
     q = request.GET.get("q", "")
-    part = request.GET.get("part", "")
+    part = _get_part(request)
     sort = request.GET.get("sort", "")
     order = request.GET.get("order", "")
     context = {
@@ -920,7 +991,7 @@ def history_page(request):
     from datetime import date, timedelta
 
     tx_type = request.GET.get("tx_type", "")
-    part = request.GET.get("part", "")
+    part = _get_part(request)
     q = request.GET.get("q", "")
     date_from = request.GET.get("date_from", "")
     date_to = request.GET.get("date_to", "")
@@ -963,7 +1034,7 @@ def history_admin_page(request):
     from datetime import date, timedelta
 
     tx_type = request.GET.get("tx_type", "")
-    part = request.GET.get("part", "")
+    part = _get_part(request)
     q = request.GET.get("q", "")
     date_from = request.GET.get("date_from", "")
     date_to = request.GET.get("date_to", "")
@@ -1034,7 +1105,7 @@ def history_admin_delete(request, record_id):
 
 @login_required
 def reagent_history_page(request):
-    part = request.GET.get("part", "")
+    part = _get_part(request)
     q = request.GET.get("q", "")
     sort = request.GET.get("sort", "")
     order = request.GET.get("order", "")
@@ -1047,9 +1118,10 @@ def reagent_history_page(request):
     selected_item_id = request.GET.get("selected_item_id", "")
     selected_item_label = request.GET.get("selected_item_label", "")
     selected_ids = request.GET.get("selected_ids", "")
-    old_new_part = request.GET.get("old_new_part", "")
+    _forced = "" if _is_dlab(request) else "ZZ"
+    old_new_part = _forced or request.GET.get("old_new_part", "")
     old_new_mode = request.GET.get("old_new_mode", "")
-    manage_part = request.GET.get("manage_part", "")
+    manage_part = _forced or request.GET.get("manage_part", "")
     manage_mode = request.GET.get("manage_mode", "")
 
     effective_part = manage_part or part

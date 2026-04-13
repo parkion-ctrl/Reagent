@@ -26,6 +26,7 @@ urlpatterns = [
     path("admin-groups/<int:group_id>/edit/", views.admin_group_form, name="admin_group_edit"),
     path("admin-groups/<int:group_id>/delete", views.admin_group_delete),
     path("admin-groups/<int:group_id>/delete/", views.admin_group_delete, name="admin_group_delete"),
+    path("set-dept/", views.set_dept_view, name="set_dept"),
     path("", views.root_redirect, name="root"),
     path("inventory", views.inventory_page),
     path("inventory/", views.inventory_page, name="inventory"),

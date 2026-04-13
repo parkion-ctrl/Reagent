@@ -28,6 +28,24 @@
             <input type="text" name="employee_no" class="form-control" value="{{ profile_employee_no if profile_employee_no else '' }}">
         </div>
         <div class="col-md-4">
+            <label class="form-label">부서</label>
+            <select name="department" id="department-select" class="form-select">
+                <option value="">선택 안 함</option>
+                {% for dept in department_choices %}
+                <option value="{{ dept }}" {% if dept == profile_department %}selected{% endif %}>{{ dept }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">파트</label>
+            <select name="part" id="part-select" class="form-select">
+                <option value="">선택 안 함</option>
+                {% for code, name in part_map.items() %}
+                <option value="{{ code }}" {% if code == profile_part %}selected{% endif %}>{{ code }} ({{ name }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
             <label class="form-label">비밀번호{% if user_obj %} <span class="text-secondary fw-normal" style="font-size:0.85em;">(조회 불가 · 변경 시에만 입력)</span>{% endif %}</label>
             <input type="password" name="password" class="form-control" placeholder="{% if user_obj %}변경하지 않으면 빈칸으로 두세요{% else %}비밀번호 입력{% endif %}">
         </div>
@@ -69,4 +87,46 @@
         </div>
     </form>
 </div>
+
+<script>
+const ALL_PARTS = {
+    {% for code, name in part_map.items() %}"{{ code }}": "{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %}
+};
+const currentPart = "{{ profile_part }}";
+
+function updatePartOptions(department) {
+    const select = document.getElementById('part-select');
+    const prev = select.value;
+    select.innerHTML = '<option value="">선택 안 함</option>';
+
+    let options;
+    if (department === '진단검사의학과') {
+        options = ALL_PARTS;
+    } else {
+        options = { "ZZ": ALL_PARTS["ZZ"] || "기타" };
+    }
+
+    for (const [code, name] of Object.entries(options)) {
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = `${code} (${name})`;
+        if (code === prev || (department !== '진단검사의학과' && code === 'ZZ')) {
+            opt.selected = true;
+        }
+        select.appendChild(opt);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const deptSelect = document.getElementById('department-select');
+    updatePartOptions(deptSelect.value);
+    // 현재 저장된 파트 복원
+    const partSelect = document.getElementById('part-select');
+    if (currentPart) partSelect.value = currentPart;
+
+    deptSelect.addEventListener('change', function () {
+        updatePartOptions(this.value);
+    });
+});
+</script>
 {% endblock %}
