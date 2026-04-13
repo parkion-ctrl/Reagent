@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="section-card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">엑셀 일괄 업로드</h5>
+        <a href="/{{ tx_mode }}/upload-template" class="btn btn-sm btn-outline-secondary">예시 파일 다운로드</a>
+    </div>
+
+    <form action="/{{ tx_mode }}/upload-preview" method="post" enctype="multipart/form-data" class="master-upload-form">
+        <input type="hidden" name="q" value="{{ q }}">
+        <input type="hidden" name="part" value="{{ part }}">
+        <div>
+            <label for="{{ tx_mode }}_excel_file" class="form-label">업로드 파일</label>
+        </div>
+        <div class="input-group master-upload-group">
+            <input type="file" class="form-control" id="{{ tx_mode }}_excel_file" name="file" accept=".xlsx,.csv" required>
+            <button type="submit" class="btn btn-primary">미리보기</button>
+        </div>
+        <div class="form-text">
+            <div>1) 예시 파일을 다운로드 한 후, 헤더는 변경하지 말아주세요.</div>
+            <div>2) item_code에는 물품코드를, lot_no에는 lot no를 입력해주세요. lot no가 없는 항목의 경우 *을 입력해주세요. qty에는 입고 및 출고 수량을, tx_date에는 입고/출고 일자를 입력해주세요.</div>
+            <div>3) 날짜의 경우 YYYYMMDD의 - 없는 8자리 일련번호 형태로 입력해주세요.</div>
+            <div>4) 미리보기 후 이상이 없으면 최종 업로드를 진행해주세요.</div>
+        </div>
+    </form>
+</div>
+
+{% if upload_error %}
+<div class="alert alert-danger">{{ upload_error }}</div>
+{% endif %}
+
+{% if preview_mode %}
+<div class="section-card mb-4">
+    <h5 class="mb-3">업로드 미리보기</h5>
+    <div class="mb-2">총 업로드 대상: <strong>{{ total_count }}</strong>건</div>
+    <div class="mb-2">실제 업로드 예정: <strong>{{ valid_count }}</strong>건</div>
+
+    {% if invalid_count > 0 %}
+    <div class="alert alert-danger">
+        {% for msg in invalid_messages %}
+        <div>{{ msg }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="table-scroll">
+        <table class="table inventory-table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>파트</th>
+                    <th>품목코드</th>
+                    <th class="sortable" onclick="sortTransactionTableByItemName(this)">품목명 <span class="sort-icon">↕</span></th>
+                    <th>Lot No</th>
+                    <th>{{ tx_qty_label }}</th>
+                    <th>{{ tx_date_label }}</th>
+                    <th>현재고</th>
+                    <th>반영 후 재고</th>
+                    <th>상태</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in preview_rows %}
+                <tr>
+                    <td>
+                        <span
+                            class="part-pill"
+                            {% if row.status == "오류" %}style="background:#e5e7eb !important; color:#111827 !important; border-color:#9ca3af !important;"{% endif %}
+                            {% if row.item_name.endswith(' (New)') and row.status != "오류" %}style="background:#dcfce7 !important; color:#166534 !important; border-color:#86efac !important;"{% endif %}
+                        >{{ row.part_label }}</span>
+                    </td>
+                    <td>{{ row.item_code }}</td>
+                    <td class="text-start item-name-cell expandable" title="{{ row.item_name }}" onclick="this.classList.toggle('expanded')" {% if row.item_name.endswith(' (New)') and row.status != "오류" %}style="color:#166534 !important; font-weight:600 !important;"{% endif %}>{{ row.item_name }}</td>
+                    <td>{{ row.lot_no }}</td>
+                    <td>{{ row.qty }}</td>
+                    <td>{{ row.tx_date }}</td>
+                    <td>{{ row.current_stock }}</td>
+                    <td>{{ row.remaining_stock }}</td>
+                    <td>{% if row.status == "오류" %}<span class="text-danger fw-semibold">{{ row.status }}</span>{% else %}{{ row.status }}{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <form action="/{{ tx_mode }}/upload-confirm" method="post" class="mt-3">
+        <input type="hidden" name="upload_data" value='{{ preview_json|safe }}'>
+        <input type="hidden" name="q" value="{{ q }}">
+        <input type="hidden" name="part" value="{{ part }}">
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success" onclick="return confirm('이 내용으로 반영하시겠습니까?');">확정</button>
+            <a href="/{{ tx_mode }}?q={{ q }}&part={{ part }}" class="btn btn-danger">취소</a>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<div class="section-card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <div class="page-section-title">{{ tx_title }}</div>
+            <p class="page-section-desc">검색 후 목록에서 선택하고 {{ tx_qty_label }}을 입력해 일괄 반영합니다.</p>
+        </div>
+    </div>
+
+    {% if message %}
+    <div class="alert alert-success">{{ message }}</div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="get" action="/{{ tx_mode }}" class="filter-bar">
+        <div class="col-lg-3">
+            <label class="form-label custom-label">파트</label>
+            <select name="part" class="form-select custom-input">
+                <option value="">전체</option>
+                {% for code, name in part_map.items() %}
+                <option value="{{ code }}" {% if part == code %}selected{% endif %}>{{ code }} ({{ name }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-lg-4">
+            <label class="form-label custom-label">품목코드 / 품목명 검색</label>
+            <input type="text" name="q" value="{{ q }}" class="form-control custom-input" placeholder="품목코드 또는 품목명을 입력하세요">
+        </div>
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="order" value="{{ order }}">
+
+        <div class="col-lg-2">
+            <button type="submit" class="btn btn-primary w-100">조회</button>
+        </div>
+
+        <div class="col-lg-2">
+            <a href="/{{ tx_mode }}" class="btn btn-outline-secondary w-100">초기화</a>
+        </div>
+    </form>
+</div>
+
+<div class="section-card">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <div class="page-section-title">현재 재고 참고</div>
+            <p class="page-section-desc mb-0">체크한 행만 {{ tx_qty_label }} 입력이 활성화됩니다.</p>
+        </div>
+        <div class="d-flex align-items-end gap-2 flex-wrap">
+            <div>
+                <label class="form-label mb-1">{{ tx_date_label }}</label>
+                <input type="date" id="{{ tx_mode }}-bulk-date" class="form-control" value="{{ today }}">
+            </div>
+            <button type="button" class="btn btn-primary" onclick="submitBulkTransaction('{{ tx_mode }}')">미리보기</button>
+        </div>
+    </div>
+
+    <div class="table-scroll">
+        <table class="table inventory-table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>
+                        <input type="checkbox" id="{{ tx_mode }}-select-all" aria-label="전체 선택">
+                    </th>
+                    <th>파트</th>
+                    <th>품목코드</th>
+                    <th onclick="sortTransactionTable('item_name')" class="sortable">품목명 <span class="sort-icon {% if sort == 'item_name' %}active{% endif %}">{% if sort == "item_name" %}{% if order == "asc" %}▲{% else %}▼{% endif %}{% else %}↕{% endif %}</span></th>
+                    <th>Lot No</th>
+                    <th>유효기간</th>
+                    <th>단위</th>
+                    <th>{{ tx_qty_label }}</th>
+                    <th>현재고</th>
+                    <th>안전재고</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr class="selectable-row" data-item-id="{{ item.id }}">
+                    <td>
+                        <input type="checkbox" class="{{ tx_mode }}-row-checkbox" value="{{ item.id }}" aria-label="항목 선택">
+                    </td>
+                    <td>
+                        <span class="part-pill" {% if item.item_name.endswith(' (New)') %}style="background:#dcfce7 !important; color:#166534 !important; border-color:#86efac !important;"{% endif %}>{{ item.part_label }}</span>
+                    </td>
+                    <td>{{ item.item_code }}</td>
+                    <td class="text-start item-name-cell expandable" title="{{ item.item_name }}" onclick="this.classList.toggle('expanded')" {% if item.item_name.endswith(' (New)') %}style="color:#166534 !important; font-weight:600 !important;"{% endif %}>{{ item.item_name }}</td>
+                    <td>{{ item.lot_no }}</td>
+                    <td>{{ item.expiry_date }}</td>
+                    <td>{{ item.unit }}</td>
+                    <td>
+                        <input
+                            type="number"
+                            class="form-control form-control-sm {{ tx_mode }}-qty-input"
+                            min="1"
+                            data-item-id="{{ item.id }}"
+                            disabled
+                        >
+                    </td>
+                    <td>{{ item.current_stock }}</td>
+                    <td>{{ item.safety_stock }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="py-4 text-center text-muted">조회된 시약이 없습니다.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<form id="{{ tx_mode }}-bulk-form" method="post" action="/{{ tx_mode }}/bulk-preview" style="display:none;">
+    <input type="hidden" name="rows_json" id="{{ tx_mode }}-rows-json">
+    <input type="hidden" name="q" value="{{ q }}">
+    <input type="hidden" name="part" value="{{ part }}">
+</form>
+
+<script>
+function updateTransactionRowHighlights(mode) {
+    document.querySelectorAll(`.${mode}-row-checkbox`).forEach(checkbox => {
+        const row = checkbox.closest('.selectable-row');
+        const qtyInput = row.querySelector(`.${mode}-qty-input`);
+        if (checkbox.checked) {
+            row.querySelectorAll('td').forEach(cell => {
+                cell.style.backgroundColor = '#e8f1ff';
+            });
+            qtyInput.disabled = false;
+        } else {
+            row.querySelectorAll('td').forEach(cell => {
+                cell.style.backgroundColor = '';
+            });
+            qtyInput.disabled = true;
+            qtyInput.value = '';
+        }
+    });
+
+    const allCheckboxes = Array.from(document.querySelectorAll(`.${mode}-row-checkbox`));
+    const selectAllCheckbox = document.getElementById(`${mode}-select-all`);
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = allCheckboxes.length > 0 && allCheckboxes.every(checkbox => checkbox.checked);
+    }
+}
+
+function sortTransactionTable(column) {
+    const url = new URL(window.location.href);
+    const currentSort = url.searchParams.get('sort');
+    const currentOrder = url.searchParams.get('order') || 'asc';
+    const nextOrder = currentSort === column && currentOrder === 'asc' ? 'desc' : 'asc';
+    url.searchParams.set('sort', column);
+    url.searchParams.set('order', nextOrder);
+    window.location.href = url.toString();
+}
+
+function submitBulkTransaction(mode) {
+    const dateInput = document.getElementById(`${mode}-bulk-date`);
+    const txDate = dateInput ? dateInput.value : '';
+    if (!txDate) {
+        alert('거래일을 입력해 주세요');
+        return;
+    }
+
+    const rows = [];
+    document.querySelectorAll(`.${mode}-row-checkbox:checked`).forEach(checkbox => {
+        const row = checkbox.closest('.selectable-row');
+        const qtyInput = row.querySelector(`.${mode}-qty-input`);
+        const qtyValue = qtyInput ? qtyInput.value.trim() : '';
+        rows.push({
+            inventory_id: Number(checkbox.value),
+            qty: Number(qtyValue || 0),
+            tx_date: txDate
+        });
+    });
+
+    if (rows.length === 0) {
+        alert(`${mode === 'inbound' ? '입고' : '출고'}할 항목을 선택해 주세요`);
+        return;
+    }
+
+    if (rows.some(row => !row.qty || row.qty < 1)) {
+        alert('선택한 항목의 수량을 1 이상으로 입력해 주세요');
+        return;
+    }
+
+    const jsonInput = document.getElementById(`${mode}-rows-json`);
+    jsonInput.value = JSON.stringify(rows);
+    document.getElementById(`${mode}-bulk-form`).submit();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const mode = '{{ tx_mode }}';
+    document.querySelectorAll(`.${mode}-row-checkbox`).forEach(checkbox => {
+        checkbox.addEventListener('change', function () {
+            updateTransactionRowHighlights(mode);
+        });
+    });
+
+    const selectAllCheckbox = document.getElementById(`${mode}-select-all`);
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function () {
+            document.querySelectorAll(`.${mode}-row-checkbox`).forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateTransactionRowHighlights(mode);
+        });
+    }
+
+    document.querySelectorAll('.item-name-cell.expandable').forEach(cell => {
+        cell.addEventListener('click', function () {
+            this.classList.toggle('expanded');
+        });
+    });
+
+    updateTransactionRowHighlights(mode);
+});
+</script>
+{% endblock %}

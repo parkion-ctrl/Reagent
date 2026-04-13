@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시약 관리 시스템</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="brand-wrap">
+            <div class="brand-badge">R</div>
+            <div>
+                <div class="brand-title">시약 관리 시스템</div>
+                <div class="brand-subtitle">Reagent Inventory</div>
+            </div>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="/inbound" class="nav-item {% if active_menu == 'inbound' %}active{% endif %}">
+                <span class="nav-icon">+</span>
+                <span>시약 입고</span>
+            </a>
+            <a href="/outbound" class="nav-item {% if active_menu == 'outbound' %}active{% endif %}">
+                <span class="nav-icon">-</span>
+                <span>시약 출고</span>
+            </a>
+            <a href="/history" class="nav-item {% if active_menu == 'history' %}active{% endif %}">
+                <span class="nav-icon">≡</span>
+                <span>입출고 이력 조회</span>
+            </a>
+            <a href="/reagent-history" class="nav-item {% if active_menu == 'reagent_history' %}active{% endif %}">
+                <span class="nav-icon">≣</span>
+                <span>시약 이력 조회</span>
+            </a>
+            <a href="/inventory" class="nav-item {% if active_menu == 'inventory' %}active{% endif %}">
+                <span class="nav-icon">◻</span>
+                <span>시약 재고</span>
+            </a>
+            <a href="/master" class="nav-item {% if active_menu == 'master' %}active{% endif %}">
+                <span class="nav-icon">▣</span>
+                <span>시약 마스터</span>
+            </a>
+            {% if request.user.is_authenticated and request.user.is_staff %}
+            <a href="/admin-panel" class="nav-item {% if active_menu == 'admin_panel' %}active{% endif %}">
+                <span class="nav-icon">⚙</span>
+                <span>관리자 페이지</span>
+            </a>
+            {% endif %}
+        </nav>
+    </aside>
+
+    <div class="main-area">
+        <header class="topbar">
+            {% if request.user.is_authenticated %}
+            <div class="topbar-login-strip">
+                <span class="topbar-login-label">접속 중인 ID</span>
+                <span class="topbar-login-name">{{ request.user.username }}</span>
+                <span class="topbar-login-label">부서</span>
+                <span class="topbar-login-name">진단검사의학과</span>
+                <div class="topbar-login-spacer"></div>
+                <a href="/logout/" class="topbar-logout-btn">로그아웃</a>
+            </div>
+            {% endif %}
+            <div>
+                <div class="topbar-title">
+                    {% if active_menu == 'inventory' %}시약 재고
+                    {% elif active_menu == 'inbound' %}시약 입고
+                    {% elif active_menu == 'outbound' %}시약 출고
+                    {% elif active_menu == 'history' %}입출고 이력 조회
+                    {% elif active_menu == 'reagent_history' %}시약 이력 조회
+                    {% elif active_menu == 'master' %}시약 마스터
+                    {% elif active_menu == 'admin_panel' %}관리자 허브
+                    {% else %}시약 관리 시스템
+                    {% endif %}
+                </div>
+                <div class="topbar-subtitle">검사실 시약 운영을 위한 재고 관리 시스템입니다.</div>
+            </div>
+        </header>
+
+        <main class="content-area">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+<script>
+function sortTable(column) {
+    const url = new URL(window.location.href);
+    const currentSort = url.searchParams.get("sort");
+    const currentOrder = url.searchParams.get("order");
+    let newOrder = "asc";
+
+    if (currentSort === column && currentOrder === "asc") {
+        newOrder = "desc";
+    }
+
+    url.searchParams.set("sort", column);
+    url.searchParams.set("order", newOrder);
+    window.location.href = url.toString();
+}
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".item-name-cell.expandable").forEach(cell => {
+        cell.addEventListener("click", function () {
+            this.classList.toggle("expanded");
+        });
+    });
+});
+</script>
+</body>
+</html>

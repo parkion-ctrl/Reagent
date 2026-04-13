@@ -1,0 +1,21 @@
+
+
+2025.03.23
+첫 시작한 날
+Fastapi+Excel pandas 기반으로 엑셀 시트에서 db 관리 구조
+
+
+2025.04.09
+입고, 출고, 입출고 이력 관리, New lot/old lot 분리 등등 기초 뼈대 작업
+UI 수정 및 일부 HTML 스타일 변경
+Excel panda library로 불러오는 구조에 한계가 있어 SQlite로 데이터 db 구조 변경
+
+
+2025.04.10
+fastapi -> django ninja
+관리자, 계정 권한 설정 등에 있어 django admin 활용 위함
+로그인, 로그아웃 시스템 및 기본 계정 시스템
+부서별 페이지 분리 기능 추가 예정
+
+excel -> sqlite -> postgreSQL
+확장성 및 추후 다중 접속 시 데이터 접근 안정성 위함. 

@@ -1,0 +1,6 @@
+item_code,item_name,quantity,safety_stock,expiry_date
+R001,CRP,15,10,2026-05-30
+R002,AST,0,10,2026-04-10
+R003,ALT,25,10,2026-12-01
+R004,Calibrator A,2,3,2026-03-28
+R005,Control Level 1,8,5,2026-06-15
