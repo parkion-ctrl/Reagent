@@ -18,7 +18,7 @@
         <div class="form-text">
             <div>1) 예시 파일을 다운로드 한 후, 헤더는 수정하지 말아주세요.</div>
             <div>2) 유해물질 여부(Hazardous) 칼럼의 경우 반드시 Y, N으로만 입력해야 합니다.</div>
-            <div>3) 파트(Part) 칼럼의 경우 HE, TA, ML, CO, IM, BB, PB, ZZ 중 하나로만 입력해주세요.</div>
+            <div>3) 파트(Part) 칼럼의 경우 {% for code, name in part_map.items() %}{{ code }}{% if not loop.last %}, {% endif %}{% endfor %} 중 하나로만 입력해주세요 ({% for code, name in part_map.items() %}{{ code }}={{ name }}{% if not loop.last %}, {% endif %}{% endfor %}). 파트명의 추가 및 변경이 필요할 경우 관리자 페이지를 이용해 주세요.</div>
             <div>4) 시약 종류(Reagent_type) 칼럼의 경우 1, 2, 3, 4, 5 중 하나로만 입력해주세요. 각각 1=Reagent, 2=Control, 3=Calibrator, 4=Supply, 5=Extra에 대응합니다.</div>
             <div>5) 품목명, 품목코드, Lot_no를 제외한 나머지 칸은 공란으로 두어도 괜찮습니다. Lot no가 없는 물품이거나 Lot no를 관리하지 않는 물품의 경우 * (shift+8)의 별표 표시 기호로 대체해주세요.</div>
             <div>6) 날짜는 YYYYMMDD 형식으로, - 표시 없이 8자리 일련번호 형식으로 입력해 주세요.</div>
@@ -157,14 +157,10 @@
         <div class="col-lg-3">
             <label class="form-label custom-label">파트</label>
             <select name="part" class="form-select custom-input">
-                {% if is_dlab %}
                 <option value="">전체</option>
                 {% for code, name in part_map.items() %}
                 <option value="{{ code }}" {% if part == code %}selected{% endif %}>{{ code }} ({{ name }})</option>
                 {% endfor %}
-                {% else %}
-                <option value="ZZ" selected>ZZ (기타)</option>
-                {% endif %}
             </select>
         </div>
         <div class="col-lg-4">

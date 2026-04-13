@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.core.db import get_connection
+from app.core.db import get_connection, get_current_schema
 from app.services.reagent_history_service import sync_expired_reagents
 from app.utils.constants import get_part_map, REAGENT_TYPE_MAP
 
@@ -78,7 +78,7 @@ def get_master_items(
         row["expiry_date"] = "" if expiry_raw == "9999-12-31" else (expiry_raw[:10] if expiry_raw else "")
 
         part_code = str(row.get("part", "")).strip()
-        part_name = get_part_map().get(part_code.upper(), "")
+        part_name = get_part_map(get_current_schema()).get(part_code.upper(), "")
         row["part"] = part_code
         row["part_label"] = f"{part_code} ({part_name})" if part_name else part_code
 
@@ -105,8 +105,10 @@ def normalize_reagent_type(value):
 
 def normalize_part_strict(value):
     part = normalize_text(value).upper()
-    if part not in get_part_map():
-        raise ValueError("part는 등록된 파트 코드만 입력할 수 있습니다.")
+    part_map = get_part_map(get_current_schema())
+    if part not in part_map:
+        valid = ", ".join(f"{code} ({name})" for code, name in part_map.items())
+        raise ValueError(f"파트 코드가 올바르지 않습니다. 허용 값: {valid}")
     return part
 
 
@@ -575,7 +577,7 @@ def preview_bulk_master_items_v3(df):
 
             safety_stock = 0 if safety_stock_raw == "" else int(float(safety_stock_raw))
             duplicate = is_duplicate_master_item(item_code, lot_no, equipment)
-            part_label = f"{part} ({get_part_map().get(part, '')})" if get_part_map().get(part, "") else part
+            part_label = f"{part} ({get_part_map(get_current_schema()).get(part, '')})" if get_part_map(get_current_schema()).get(part, "") else part
 
             row_data = {
                 "hazardous": hazardous,
@@ -603,7 +605,7 @@ def preview_bulk_master_items_v3(df):
                 upload_rows.append(row_data)
         except Exception as exc:
             raw_part = normalize_text(row.get("part")).upper()
-            part_name = get_part_map().get(raw_part, "")
+            part_name = get_part_map(get_current_schema()).get(raw_part, "")
             preview_rows.append(
                 {
                     "hazardous": normalize_text(row.get("hazardous")).upper(),

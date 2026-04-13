@@ -19,25 +19,33 @@
                 <tr>
                     <th>파트 코드</th>
                     <th>파트명</th>
+                    <th>사용 중인 시약</th>
                     <th class="text-end">작업</th>
                 </tr>
             </thead>
             <tbody>
-                {% for part in parts %}
+                {% for row in parts_data %}
                 <tr>
-                    <td><span class="badge bg-primary">{{ part.code }}</span></td>
-                    <td>{{ part.name }}</td>
+                    <td><span class="badge bg-primary">{{ row.obj.code }}</span></td>
+                    <td>{{ row.obj.name }}</td>
+                    <td>
+                        {% if row.usage > 0 %}
+                        <span class="badge text-bg-warning">{{ row.usage }}건 사용 중</span>
+                        {% else %}
+                        <span class="text-muted small">없음</span>
+                        {% endif %}
+                    </td>
                     <td class="text-end">
-                        <a href="/admin-parts/{{ part.id }}/edit/" class="btn btn-sm btn-outline-secondary me-1">수정</a>
-                        <form method="post" action="/admin-parts/{{ part.id }}/delete/" class="d-inline"
-                              onsubmit="return confirm('{{ part.code }} ({{ part.name }}) 파트를 삭제하시겠습니까?')">
-                            {% csrf_token %}
+                        <a href="/admin-parts/{{ row.obj.id }}/edit/" class="btn btn-sm btn-outline-secondary me-1">수정</a>
+                        <form method="post" action="/admin-parts/{{ row.obj.id }}/delete/" class="d-inline"
+                              onsubmit="return confirmDelete('{{ row.obj.code }}', '{{ row.obj.name }}', {{ row.usage }})">
+                            {{ csrf_input }}
                             <button type="submit" class="btn btn-sm btn-outline-danger">삭제</button>
                         </form>
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="3" class="text-center text-muted py-4">등록된 파트가 없습니다.</td></tr>
+                <tr><td colspan="4" class="text-center text-muted py-4">등록된 파트가 없습니다.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -47,4 +55,16 @@
         <a href="/admin-panel/" class="btn btn-outline-secondary">← 관리자 허브</a>
     </div>
 </div>
+<script>
+function confirmDelete(code, name, usage) {
+    if (usage > 0) {
+        return confirm(
+            '[' + code + '] ' + name + ' 파트를 삭제하시겠습니까?\n\n' +
+            '⚠ 현재 ' + usage + '건의 시약 데이터에서 이 파트 코드를 사용 중입니다.\n' +
+            '삭제해도 시약 데이터는 유지되지만, 해당 시약의 파트명이 표시되지 않습니다.'
+        );
+    }
+    return confirm('[' + code + '] ' + name + ' 파트를 삭제하시겠습니까?');
+}
+</script>
 {% endblock %}

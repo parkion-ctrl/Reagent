@@ -50,12 +50,14 @@ class TransactionHistory(models.Model):
 
 
 class Part(models.Model):
-    code = models.CharField(max_length=10, unique=True)
+    code = models.CharField(max_length=10)
     name = models.CharField(max_length=50)
+    schema_name = models.CharField(max_length=20, null=True, blank=True)
 
     class Meta:
         db_table = "lab_part"
         ordering = ["code"]
+        unique_together = [("code", "schema_name")]
 
     def __str__(self):
         return f"{self.code} ({self.name})"

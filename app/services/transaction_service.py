@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from app.core.db import get_connection
+from app.core.db import get_connection, get_current_schema
 from app.services.reagent_history_service import sync_expired_reagents
 from app.utils.constants import get_part_map
 
@@ -51,7 +51,7 @@ def get_transaction_table_items(tx_type: str, q: str = "", part: str = "", sort:
     for row in rows:
         row = dict(row)
         part_code = str(row.get("part", "")).strip()
-        part_name = get_part_map().get(part_code, "")
+        part_name = get_part_map(get_current_schema()).get(part_code, "")
         row["part_label"] = f"{part_code} ({part_name})" if part_name else part_code
         row["display_name"] = f"{row['item_code']} | {row['item_name']} | Lot {row.get('lot_no', '') or '-'}"
         raw_expiry = str(row.get("expiry_date", "") or "").strip()
@@ -187,7 +187,7 @@ def preview_bulk_transaction_items(tx_type: str, df):
 
                 remaining_stock = current_stock + qty if tx_type == "IN" else current_stock - qty
                 part_code = str(inventory_item.get("part", "")).strip()
-                part_name = get_part_map().get(part_code, "")
+                part_name = get_part_map(get_current_schema()).get(part_code, "")
 
                 preview_row = {
                     "inventory_id": inventory_item["id"],
@@ -221,7 +221,7 @@ def preview_bulk_transaction_items(tx_type: str, df):
                 )
                 fallback_data = dict(fallback_item) if fallback_item else {}
                 fallback_part = str(fallback_data.get("part", "")).strip()
-                fallback_part_name = get_part_map().get(fallback_part, "")
+                fallback_part_name = get_part_map(get_current_schema()).get(fallback_part, "")
                 fallback_current_stock = int(fallback_data.get("current_stock", 0) or 0) if fallback_data else ""
                 fallback_qty_raw = normalize_text(row.get("qty"))
                 fallback_qty = int(float(fallback_qty_raw)) if fallback_qty_raw not in {"", None} else ""
@@ -297,7 +297,7 @@ def preview_manual_transaction_items(tx_type: str, rows: list[dict]):
 
                 remaining_stock = current_stock + qty if tx_type == "IN" else current_stock - qty
                 part_code = str(inventory_item.get("part", "")).strip()
-                part_name = get_part_map().get(part_code, "")
+                part_name = get_part_map(get_current_schema()).get(part_code, "")
 
                 preview_rows.append(
                     {
@@ -344,7 +344,7 @@ def preview_manual_transaction_items(tx_type: str, rows: list[dict]):
                         fallback_data = {}
 
                 fallback_part = str(fallback_data.get("part", "")).strip()
-                fallback_part_name = get_part_map().get(fallback_part, "")
+                fallback_part_name = get_part_map(get_current_schema()).get(fallback_part, "")
                 fallback_current_stock = int(fallback_data.get("current_stock", 0) or 0) if fallback_data else ""
                 fallback_qty_raw = normalize_text(row.get("qty"))
                 fallback_qty = int(float(fallback_qty_raw)) if fallback_qty_raw not in {"", None} else ""

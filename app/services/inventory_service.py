@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.core.db import get_connection
+from app.core.db import get_connection, get_current_schema
 from app.services.reagent_history_service import sync_expired_reagents
 from app.utils.constants import get_part_map, REAGENT_TYPE_MAP
 
@@ -84,7 +84,7 @@ def get_inventory_items(
             status = "부족"
 
         part_code = str(row.get("part", "")).strip()
-        part_name = get_part_map().get(part_code, "")
+        part_name = get_part_map(get_current_schema()).get(part_code, "")
         raw_date = str(row.get("expiry_date", "")).strip()
         expiry_text = ""
         expiry_class = ""

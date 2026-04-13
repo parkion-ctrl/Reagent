@@ -13,7 +13,7 @@ from django.contrib.auth.hashers import make_password
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 
-from app.core.db import get_connection
+from app.core.db import get_connection, get_current_schema
 from app.services.history_service import get_history_items
 from app.services.inbound_service import (
     create_bulk_inbound_transactions,
@@ -60,15 +60,12 @@ def can_access_admin_area(user):
 
 def _is_dlab(request):
     """현재 활성 스키마가 진단검사의학과(dlab)인지 여부."""
-    from app.core.db import get_current_schema
     return get_current_schema() == "dlab"
 
 
 def _get_part(request):
-    """파트 파라미터를 반환한다. 진검 외 부서는 ZZ로 강제."""
-    if _is_dlab(request):
-        return request.GET.get("part", "")
-    return "ZZ"
+    """파트 파라미터를 반환한다."""
+    return request.GET.get("part", "")
 
 
 @csrf_exempt
@@ -122,20 +119,43 @@ def set_dept_view(request):
 @user_passes_test(can_access_admin_area)
 def admin_panel(request):
     from datetime import date, timedelta
+
     one_month_ago = (date.today() - timedelta(days=30)).isoformat()
+
+    # 현재 부서 파악
+    if request.user.is_superuser:
+        active_dept = request.session.get("superuser_active_dept", "진단검사의학과")
+    else:
+        profile = UserProfile.objects.filter(user=request.user).first()
+        active_dept = profile.department if profile else ""
+
+    user_count = User.objects.filter(profile__department=active_dept).count() if active_dept else User.objects.count()
+
+    # 시약/이력은 get_connection()으로 현재 스키마에서 직접 집계
+    inventory_count = 0
+    history_count = 0
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM inventory WHERE disposed_at IS NULL")
+        inventory_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM transaction_history WHERE tx_date >= %s", (one_month_ago,))
+        history_count = cur.fetchone()[0]
+        conn.close()
+    except Exception:
+        pass
+
     return render(
         request,
         "admin_panel.html",
         {
             "active_menu": "admin_panel",
             "stats": {
-                "users": User.objects.count(),
+                "users": user_count,
                 "groups": Group.objects.count(),
-                "inventory": Inventory.objects.count(),
-                "history": TransactionHistory.objects.filter(tx_date__gte=one_month_ago).count(),
+                "inventory": inventory_count,
+                "history": history_count,
             },
-            "recent_users": User.objects.order_by("-last_login", "-id")[:8],
-            "recent_groups": Group.objects.order_by("name"),
         },
     )
 
@@ -190,7 +210,7 @@ def admin_users(request):
             {
                 "user": user,
                 "employee_no": profile.employee_no if profile else "",
-                "part": f"{part_code} ({get_part_map().get(part_code, '')})" if part_code else part_code,
+                "part": f"{part_code} ({get_part_map(get_current_schema()).get(part_code, '')})" if part_code else part_code,
                 "department": profile.department if profile else "",
                 "group_names": group_names,
                 "role_labels": role_labels,
@@ -205,7 +225,7 @@ def admin_users(request):
             "q": q,
             "selected_part": selected_part,
             "selected_department": selected_department,
-            "part_map": get_part_map(),
+            "part_map": get_part_map(get_current_schema()),
             "department_choices": [c[0] for c in DEPARTMENT_CHOICES],
             "is_superadmin": is_superadmin,
         },
@@ -293,7 +313,7 @@ def admin_user_form(request, user_id=None):
         "profile_department": profile_obj.department if profile_obj else "",
         "groups": role_groups,
         "selected_group_id": selected_group_id,
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
         "department_choices": ["진단검사의학과", "병리과", "핵의학과", "유해물질"],
         "errors": errors,
     }
@@ -375,11 +395,40 @@ def admin_group_delete(request, group_id):
 @user_passes_test(can_access_admin_area)
 def admin_parts(request):
     from lab.models import Part
+    from app.core.db import ALL_SCHEMAS
+    import psycopg
+    from app.core.db import PG_HOST, PG_PORT, PG_DBNAME, PG_USER, PG_PASSWORD
+
     message = request.GET.get("message", "")
-    parts = Part.objects.all()
+    current_schema = get_current_schema()
+    # dlab은 schema_name=None, 나머지는 해당 schema_name으로 필터
+    if current_schema == "dlab" or current_schema is None:
+        qs = Part.objects.filter(schema_name__isnull=True)
+    else:
+        qs = Part.objects.filter(schema_name=current_schema)
+    parts = list(qs)
+
+    # 현재 부서 스키마 기준 파트별 사용 건수 집계
+    usage = {}
+    try:
+        schemas = ALL_SCHEMAS if (current_schema == "dlab" or current_schema is None) else ([current_schema] if current_schema else [])
+        conn = psycopg.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DBNAME,
+                               user=PG_USER, password=PG_PASSWORD)
+        cur = conn.cursor()
+        for schema in schemas:
+            cur.execute(f"SELECT part, COUNT(*) FROM {schema}.inventory WHERE disposed_at IS NULL GROUP BY part")
+            for row in cur.fetchall():
+                code = (row[0] or "").strip()
+                usage[code] = usage.get(code, 0) + int(row[1])
+        conn.close()
+    except Exception:
+        pass
+
+    parts_data = [{"obj": p, "usage": usage.get(p.code, 0)} for p in parts]
+
     return render(request, "admin_parts.html", {
         "active_menu": "admin_panel",
-        "parts": parts,
+        "parts_data": parts_data,
         "message": message,
     })
 
@@ -388,6 +437,10 @@ def admin_parts(request):
 @user_passes_test(can_access_admin_area)
 def admin_part_form(request, part_id=None):
     from lab.models import Part
+    current_schema = get_current_schema()
+    # dlab은 schema_name=None, 나머지는 해당 schema_name
+    save_schema = None if (current_schema == "dlab" or current_schema is None) else current_schema
+
     part_obj = Part.objects.filter(id=part_id).first() if part_id else None
     errors = []
 
@@ -399,7 +452,7 @@ def admin_part_form(request, part_id=None):
             errors.append("파트 코드는 필수입니다.")
         if not name:
             errors.append("파트명은 필수입니다.")
-        if code and Part.objects.filter(code=code).exclude(id=part_id).exists():
+        if code and Part.objects.filter(code=code, schema_name=save_schema).exclude(id=part_id).exists():
             errors.append(f"파트 코드 '{code}'는 이미 존재합니다.")
 
         if not errors:
@@ -408,7 +461,7 @@ def admin_part_form(request, part_id=None):
                 part_obj.name = name
                 part_obj.save()
             else:
-                Part.objects.create(code=code, name=name)
+                Part.objects.create(code=code, name=name, schema_name=save_schema)
             return redirect("/admin-parts/?message=저장되었습니다.")
 
     return render(request, "admin_part_form.html", {
@@ -438,7 +491,7 @@ def get_master_base_context():
     return {
         "active_menu": "master",
         "items": get_master_items(),
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
         "part": "",
         "q": "",
         "sort": "",
@@ -480,7 +533,7 @@ def inventory_page(request):
             sort=sort,
             order=order,
         ),
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
         "part": part,
         "q": q,
         "reagent_type": reagent_type,
@@ -522,7 +575,7 @@ def master_page(request):
             sort=sort,
             order=order,
         ),
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
         "part": part,
         "q": q,
         "sort": sort,
@@ -739,7 +792,7 @@ def inbound_page(request):
         "part": part,
         "sort": sort,
         "order": order,
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
     }
     context.update(get_inbound_page_data(q=q, part=part, sort=sort, order=order))
     return render(request, "transaction_entry.html", context)
@@ -759,7 +812,7 @@ def get_inbound_base_context(q: str = "", part: str = "", sort: str = "", order:
         "part": part,
         "sort": sort,
         "order": order,
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
     }
     context.update(get_inbound_page_data(q=q, part=part, sort=sort, order=order))
     return context
@@ -901,7 +954,7 @@ def outbound_page(request):
         "part": part,
         "sort": sort,
         "order": order,
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
     }
     context.update(get_outbound_page_data(q=q, part=part, sort=sort, order=order))
     return render(request, "transaction_entry.html", context)
@@ -921,7 +974,7 @@ def get_outbound_base_context(q: str = "", part: str = "", sort: str = "", order
         "part": part,
         "sort": sort,
         "order": order,
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
     }
     context.update(get_outbound_page_data(q=q, part=part, sort=sort, order=order))
     return context
@@ -1081,7 +1134,7 @@ def history_page(request):
         "date_from": date_from,
         "date_to": date_to,
         "period": period,
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
     }
     return render(request, "history.html", context)
 
@@ -1118,7 +1171,7 @@ def history_admin_page(request):
         "date_from": date_from,
         "date_to": date_to,
         "period": period,
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
         "message": request.GET.get("message", ""),
         "error": request.GET.get("error", ""),
     }
@@ -1207,7 +1260,7 @@ def reagent_history_page(request):
             sort=sort,
             order=order,
         ),
-        "part_map": get_part_map(),
+        "part_map": get_part_map(get_current_schema()),
         "part": part,
         "q": q,
         "sort": sort,

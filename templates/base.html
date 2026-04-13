@@ -60,7 +60,7 @@
                 <span class="topbar-login-name">{{ request.user.username }}</span>
                 <span class="topbar-login-label">접속 중인 부서</span>
                 {% if is_superuser_session %}
-                <select class="topbar-login-name dept-select" id="deptSelect"
+                <select class="dept-select" id="deptSelect"
                         onchange="switchDept(this.value)">
                     {% for dept_name in superuser_dept_list %}
                     <option value="{{ dept_name }}"
@@ -129,6 +129,7 @@ function switchDept(dept) {
     var next = encodeURIComponent(window.location.pathname + window.location.search);
     window.location.href = "/set-dept/?dept=" + encodeURIComponent(dept) + "&next=" + next;
 }
+
 </script>
 </body>
 </html>

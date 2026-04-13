@@ -10,7 +10,7 @@
     {% endif %}
 
     <form method="post">
-        {% csrf_token %}
+        {{ csrf_input }}
         <div class="mb-3">
             <label class="form-label custom-label">파트 코드 <span class="text-danger">*</span></label>
             <input type="text" name="code" class="form-control custom-input"

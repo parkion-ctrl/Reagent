@@ -276,6 +276,12 @@ body {
     background-color: rgba(255, 255, 255, 0.28);
 }
 
+.dept-select option {
+    color: #000000;
+    background: #ffffff;
+}
+
+
 .topbar-title {
     font-size: 30px;
     font-weight: 800;

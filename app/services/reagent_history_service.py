@@ -1,7 +1,7 @@
 from datetime import date
 from html import escape
 
-from app.core.db import get_connection
+from app.core.db import get_connection, get_current_schema
 from app.utils.constants import get_part_map, REAGENT_TYPE_MAP
 
 
@@ -299,7 +299,7 @@ def get_reagent_history_items(
     for row in rows:
         row = dict(row)
         part_code = str(row.get("part", "")).strip()
-        part_name = get_part_map().get(part_code.upper(), "")
+        part_name = get_part_map(get_current_schema()).get(part_code.upper(), "")
         row["part_label"] = f"{part_code} ({part_name})" if part_name else part_code
         row["reagent_type"] = REAGENT_TYPE_MAP.get(
             str(row.get("reagent_type", "")).strip(),
@@ -410,7 +410,7 @@ def get_old_new_lot_items(part: str = "", only_new: bool = False):
         row["item_name_html"] = compose_item_name_html(row["item_name"], row.get("lot_status"))
         row["item_name_class"] = "lot-new-name" if row.get("lot_status") == "NEW" else ""
         row["group_key"] = f"{row.get('item_code', '')}||{base_item_name}"
-        row["part_label"] = f"{row.get('part', '')} ({get_part_map().get(str(row.get('part', '')).upper(), '')})".strip()
+        row["part_label"] = f"{row.get('part', '')} ({get_part_map(get_current_schema()).get(str(row.get('part', '')).upper(), '')})".strip()
         row["disposed"] = "Y" if row.get("disposed_at") else "N"
         row["expiry_date"] = format_date_text(row.get("expiry_date"))
         items.append(row)

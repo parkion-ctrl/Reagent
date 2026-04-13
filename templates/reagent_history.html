@@ -21,14 +21,10 @@
         <div class="col-lg-3">
             <label class="form-label custom-label">파트</label>
             <select name="old_new_part" class="form-select custom-input">
-                {% if is_dlab %}
                 <option value="">선택</option>
                 {% for code, name in part_map.items() %}
                 <option value="{{ code }}" {% if old_new_part == code %}selected{% endif %}>{{ code }} ({{ name }})</option>
                 {% endfor %}
-                {% else %}
-                <option value="ZZ" selected>ZZ (기타)</option>
-                {% endif %}
             </select>
         </div>
         <input type="hidden" name="old_new_mode" id="old-new-mode" value="{{ old_new_mode }}">
@@ -113,14 +109,10 @@
         <div class="col-lg-2">
             <label class="form-label custom-label">파트</label>
             <select name="manage_part" class="form-select custom-input">
-                {% if is_dlab %}
                 <option value="">선택</option>
                 {% for code, name in part_map.items() %}
                 <option value="{{ code }}" {% if manage_part == code %}selected{% endif %}>{{ code }} ({{ name }})</option>
                 {% endfor %}
-                {% else %}
-                <option value="ZZ" selected>ZZ (기타)</option>
-                {% endif %}
             </select>
         </div>
         <div class="col-lg-3">

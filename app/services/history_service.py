@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from app.core.db import get_connection
+from app.core.db import get_connection, get_current_schema
 from app.utils.constants import get_part_map
 
 
@@ -86,20 +86,29 @@ def get_history_items(
     for row in rows:
         row = dict(row)
         part_code = str(row.get("part", "")).strip()
-        part_name = get_part_map().get(part_code, "")
+        part_name = get_part_map(get_current_schema()).get(part_code, "")
         row["part_label"] = f"{part_code} ({part_name})" if part_name else part_code
         row["tx_type_label"] = "입고" if row["tx_type"] == "IN" else "출고"
         row["tx_badge_class"] = "text-bg-primary" if row["tx_type"] == "IN" else "text-bg-secondary"
         row["inbound_qty"] = row["qty"] if row["tx_type"] == "IN" else ""
         row["outbound_qty"] = row["qty"] if row["tx_type"] == "OUT" else ""
 
-        created_at = str(row.get("created_at", "")).strip()
+        created_at = row.get("created_at")
         if created_at:
             try:
-                utc_dt = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
-                row["created_at_display"] = (utc_dt + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                row["created_at_display"] = created_at
+                # psycopg가 datetime 객체로 반환하는 경우
+                if hasattr(created_at, "strftime"):
+                    from datetime import timezone
+                    if created_at.tzinfo is not None:
+                        created_at = created_at.astimezone(timezone(timedelta(hours=9)))
+                    else:
+                        created_at = created_at + timedelta(hours=9)
+                    row["created_at_display"] = created_at.strftime("%Y-%m-%d %H:%M")
+                else:
+                    # 문자열인 경우 앞 16자 (YYYY-MM-DD HH:MM) 만 사용
+                    row["created_at_display"] = str(created_at).strip()[:16]
+            except Exception:
+                row["created_at_display"] = str(created_at)[:16]
         else:
             row["created_at_display"] = ""
 
