@@ -49,6 +49,18 @@ class TransactionHistory(models.Model):
         db_table = "transaction_history"
 
 
+class Part(models.Model):
+    code = models.CharField(max_length=10, unique=True)
+    name = models.CharField(max_length=50)
+
+    class Meta:
+        db_table = "lab_part"
+        ordering = ["code"]
+
+    def __str__(self):
+        return f"{self.code} ({self.name})"
+
+
 DEPARTMENT_CHOICES = [
     ("진단검사의학과", "진단검사의학과"),
     ("병리과", "병리과"),

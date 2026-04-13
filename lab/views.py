@@ -47,7 +47,7 @@ from app.services.reagent_history_service import (
     update_parallel_at,
 )
 from .models import Inventory, TransactionHistory, UserProfile
-from app.utils.constants import PART_MAP
+from app.utils.constants import PART_MAP, get_part_map
 
 
 def can_access_admin_area(user):
@@ -190,7 +190,7 @@ def admin_users(request):
             {
                 "user": user,
                 "employee_no": profile.employee_no if profile else "",
-                "part": f"{part_code} ({PART_MAP[part_code]})" if part_code and part_code in PART_MAP else part_code,
+                "part": f"{part_code} ({get_part_map().get(part_code, '')})" if part_code else part_code,
                 "department": profile.department if profile else "",
                 "group_names": group_names,
                 "role_labels": role_labels,
@@ -205,7 +205,7 @@ def admin_users(request):
             "q": q,
             "selected_part": selected_part,
             "selected_department": selected_department,
-            "part_map": PART_MAP,
+            "part_map": get_part_map(),
             "department_choices": [c[0] for c in DEPARTMENT_CHOICES],
             "is_superadmin": is_superadmin,
         },
@@ -293,7 +293,7 @@ def admin_user_form(request, user_id=None):
         "profile_department": profile_obj.department if profile_obj else "",
         "groups": role_groups,
         "selected_group_id": selected_group_id,
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
         "department_choices": ["진단검사의학과", "병리과", "핵의학과", "유해물질"],
         "errors": errors,
     }
@@ -372,6 +372,64 @@ def admin_group_delete(request, group_id):
 
 
 @login_required
+@user_passes_test(can_access_admin_area)
+def admin_parts(request):
+    from lab.models import Part
+    message = request.GET.get("message", "")
+    parts = Part.objects.all()
+    return render(request, "admin_parts.html", {
+        "active_menu": "admin_panel",
+        "parts": parts,
+        "message": message,
+    })
+
+
+@login_required
+@user_passes_test(can_access_admin_area)
+def admin_part_form(request, part_id=None):
+    from lab.models import Part
+    part_obj = Part.objects.filter(id=part_id).first() if part_id else None
+    errors = []
+
+    if request.method == "POST":
+        code = request.POST.get("code", "").strip().upper()
+        name = request.POST.get("name", "").strip()
+
+        if not code:
+            errors.append("파트 코드는 필수입니다.")
+        if not name:
+            errors.append("파트명은 필수입니다.")
+        if code and Part.objects.filter(code=code).exclude(id=part_id).exists():
+            errors.append(f"파트 코드 '{code}'는 이미 존재합니다.")
+
+        if not errors:
+            if part_obj:
+                part_obj.code = code
+                part_obj.name = name
+                part_obj.save()
+            else:
+                Part.objects.create(code=code, name=name)
+            return redirect("/admin-parts/?message=저장되었습니다.")
+
+    return render(request, "admin_part_form.html", {
+        "active_menu": "admin_panel",
+        "part_obj": part_obj,
+        "errors": errors,
+    })
+
+
+@login_required
+@user_passes_test(can_access_admin_area)
+@csrf_exempt
+def admin_part_delete(request, part_id):
+    if request.method != "POST":
+        return redirect("admin_parts")
+    from lab.models import Part
+    Part.objects.filter(id=part_id).delete()
+    return redirect("/admin-parts/?message=삭제되었습니다.")
+
+
+@login_required
 def root_redirect(request):
     return redirect("login")
 
@@ -380,7 +438,7 @@ def get_master_base_context():
     return {
         "active_menu": "master",
         "items": get_master_items(),
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
         "part": "",
         "q": "",
         "sort": "",
@@ -422,7 +480,7 @@ def inventory_page(request):
             sort=sort,
             order=order,
         ),
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
         "part": part,
         "q": q,
         "reagent_type": reagent_type,
@@ -464,7 +522,7 @@ def master_page(request):
             sort=sort,
             order=order,
         ),
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
         "part": part,
         "q": q,
         "sort": sort,
@@ -681,7 +739,7 @@ def inbound_page(request):
         "part": part,
         "sort": sort,
         "order": order,
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
     }
     context.update(get_inbound_page_data(q=q, part=part, sort=sort, order=order))
     return render(request, "transaction_entry.html", context)
@@ -701,7 +759,7 @@ def get_inbound_base_context(q: str = "", part: str = "", sort: str = "", order:
         "part": part,
         "sort": sort,
         "order": order,
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
     }
     context.update(get_inbound_page_data(q=q, part=part, sort=sort, order=order))
     return context
@@ -843,7 +901,7 @@ def outbound_page(request):
         "part": part,
         "sort": sort,
         "order": order,
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
     }
     context.update(get_outbound_page_data(q=q, part=part, sort=sort, order=order))
     return render(request, "transaction_entry.html", context)
@@ -863,7 +921,7 @@ def get_outbound_base_context(q: str = "", part: str = "", sort: str = "", order
         "part": part,
         "sort": sort,
         "order": order,
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
     }
     context.update(get_outbound_page_data(q=q, part=part, sort=sort, order=order))
     return context
@@ -1023,7 +1081,7 @@ def history_page(request):
         "date_from": date_from,
         "date_to": date_to,
         "period": period,
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
     }
     return render(request, "history.html", context)
 
@@ -1060,7 +1118,7 @@ def history_admin_page(request):
         "date_from": date_from,
         "date_to": date_to,
         "period": period,
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
         "message": request.GET.get("message", ""),
         "error": request.GET.get("error", ""),
     }
@@ -1149,7 +1207,7 @@ def reagent_history_page(request):
             sort=sort,
             order=order,
         ),
-        "part_map": PART_MAP,
+        "part_map": get_part_map(),
         "part": part,
         "q": q,
         "sort": sort,

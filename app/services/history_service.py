@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from app.core.db import get_connection
-from app.utils.constants import PART_MAP
+from app.utils.constants import get_part_map
 
 
 def backfill_remaining_stock():
@@ -86,7 +86,7 @@ def get_history_items(
     for row in rows:
         row = dict(row)
         part_code = str(row.get("part", "")).strip()
-        part_name = PART_MAP.get(part_code, "")
+        part_name = get_part_map().get(part_code, "")
         row["part_label"] = f"{part_code} ({part_name})" if part_name else part_code
         row["tx_type_label"] = "입고" if row["tx_type"] == "IN" else "출고"
         row["tx_badge_class"] = "text-bg-primary" if row["tx_type"] == "IN" else "text-bg-secondary"

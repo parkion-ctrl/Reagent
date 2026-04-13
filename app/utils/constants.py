@@ -16,6 +16,18 @@ PART_MAP = {
     "ZZ": "기타",
 }
 
+
+def get_part_map() -> dict:
+    """DB의 Part 테이블에서 파트 맵을 반환. 실패 시 기본값 사용."""
+    try:
+        from lab.models import Part
+        parts = dict(Part.objects.values_list("code", "name"))
+        if parts:
+            return parts
+    except Exception:
+        pass
+    return dict(PART_MAP)
+
 REAGENT_TYPE_MAP = {
     "1": "Reagent",
     "2": "Control",
