@@ -70,7 +70,7 @@
         </div>
 
         <div class="filter-item short">
-            <a href="/history-admin" class="btn btn-outline-secondary custom-btn w-100">초기화</a>
+            <a href="/history-admin?part=" class="btn btn-outline-secondary custom-btn w-100">초기화</a>
         </div>
     </form>
 </div>
@@ -86,10 +86,12 @@
                     <th>품목코드</th>
                     <th>품목명</th>
                     <th>Lot No</th>
+                    <th>업체</th>
+                    <th>시약 구분</th>
                     <th>입고 수량</th>
                     <th>출고 수량</th>
                     <th>잔여 재고</th>
-                    <th>등록시각</th>
+                    <th>등록자</th>
                     <th class="text-end">작업</th>
                 </tr>
             </thead>
@@ -98,7 +100,11 @@
                 <tr>
                     <td>{{ item.tx_date }}</td>
                     <td>
+                        {% if item.billing_label %}
+                        <span class="badge rounded-pill {{ item.billing_badge }}">{{ item.billing_label }}</span>
+                        {% else %}
                         <span class="badge rounded-pill {{ item.tx_badge_class }}">{{ item.tx_type_label }}</span>
+                        {% endif %}
                     </td>
                     <td>
                         <span class="part-pill">{{ item.part_label }}</span>
@@ -106,10 +112,12 @@
                     <td>{{ item.item_code }}</td>
                     <td class="text-start item-name-cell expandable" title="{{ item.item_name }}" onclick="this.classList.toggle('expanded')">{{ item.item_name }}</td>
                     <td>{{ item.lot_no }}</td>
+                    <td>{{ item.vendor }}</td>
+                    <td>{{ item.reagent_type_label }}</td>
                     <td>{{ item.inbound_qty }}</td>
                     <td>{{ item.outbound_qty }}</td>
                     <td>{{ item.remaining_stock }}</td>
-                    <td>{{ item.created_at_display }}</td>
+                    <td>{{ item.created_by }}</td>
                     <td class="text-end" style="white-space:nowrap;">
                         <button class="btn btn-sm btn-outline-primary"
                             onclick="openEditModal({{ item.id }}, '{{ item.tx_type }}', '{{ item.tx_date }}', {{ item.qty }})">
@@ -124,7 +132,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="11" class="py-4 text-center text-muted">등록된 이력이 없습니다.</td>
+                    <td colspan="12" class="py-4 text-center text-muted">등록된 이력이 없습니다.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -167,6 +175,13 @@
         </div>
     </div>
 </div>
+
+<style>
+.badge-teal {
+    background-color: #0d9488;
+    color: #fff;
+}
+</style>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>

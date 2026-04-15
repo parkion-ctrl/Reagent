@@ -14,7 +14,7 @@ from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 
 from app.core.db import get_connection, get_current_schema
-from app.services.history_service import get_history_items
+from app.services.history_service import get_history_items, get_history_vendor_options, get_history_reagent_type_options
 from app.services.inbound_service import (
     create_bulk_inbound_transactions,
     get_inbound_page_data,
@@ -64,8 +64,18 @@ def _is_dlab(request):
 
 
 def _get_part(request):
-    """파트 파라미터를 반환한다."""
-    return request.GET.get("part", "")
+    """파트 파라미터를 반환한다. 미지정 시 로그인 사용자의 기본 파트 사용."""
+    part = request.GET.get("part")
+    if part is not None:
+        return part
+    if request.user.is_authenticated:
+        if request.user.is_superuser:
+            return ""
+        try:
+            return request.user.profile.part or ""
+        except Exception:
+            pass
+    return ""
 
 
 @csrf_exempt
@@ -549,6 +559,62 @@ def inventory_page(request):
 
 
 @login_required
+def inventory_export(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    part = request.GET.get("part", "")
+    q = request.GET.get("q", "")
+    reagent_type = request.GET.get("reagent_type", "")
+    equipment = request.GET.get("equipment", "")
+    vendor = request.GET.get("vendor", "")
+    hazardous = request.GET.get("hazardous", "")
+    expiry_filter = request.GET.get("expiry_filter", "")
+    sort = request.GET.get("sort", "")
+    order = request.GET.get("order", "")
+
+    items = get_inventory_items(
+        part=part, q=q, reagent_type=reagent_type, equipment=equipment,
+        vendor=vendor, hazardous=hazardous, expiry_filter=expiry_filter,
+        sort=sort, order=order,
+    )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "시약재고"
+
+    headers = ["파트", "품목코드", "품목명", "Lot No", "유효기간", "규격", "단위",
+               "시약종류", "장비", "업체", "현재재고", "안전재고", "필요수량", "유해화학물질"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="D9E1F2")
+        cell.alignment = Alignment(horizontal="center")
+
+    for item in items:
+        ws.append([
+            item["part_label"], item["item_code"], item["item_name"],
+            item["lot_no"] or "", item["expiry_date"] or "", item["spec"] or "",
+            item["unit"] or "", item["reagent_type"] or "", item["equipment"] or "",
+            item["vendor"] or "", item["current_stock"], item["safety_stock"],
+            item["required_qty"], item["hazardous"] or "",
+        ])
+
+    col_widths = [16, 14, 40, 16, 12, 16, 8, 14, 18, 18, 10, 10, 10, 14]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    from urllib.parse import quote
+    encoded = quote("시약재고.xlsx")
+    response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded}"
+    return response
+
+
+@login_required
 def master_page(request):
     part = _get_part(request)
     q = request.GET.get("q", "")
@@ -591,6 +657,60 @@ def master_page(request):
         "filter_options": get_inventory_filter_options(),
     }
     return render(request, "master.html", context)
+
+
+@login_required
+def master_export(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    part = request.GET.get("part", "")
+    q = request.GET.get("q", "")
+    reagent_type = request.GET.get("reagent_type", "")
+    equipment = request.GET.get("equipment", "")
+    vendor = request.GET.get("vendor", "")
+    hazardous = request.GET.get("hazardous", "")
+    sort = request.GET.get("sort", "")
+    order = request.GET.get("order", "")
+
+    items = get_master_items(
+        part=part, q=q, reagent_type=reagent_type, equipment=equipment,
+        vendor=vendor, hazardous=hazardous, sort=sort, order=order,
+    )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "시약마스터"
+
+    headers = ["파트", "품목코드", "품목명", "Lot No", "유효기간", "규격", "단위",
+               "시약종류", "장비", "업체", "현재재고", "안전재고", "유해화학물질"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="D9E1F2")
+        cell.alignment = Alignment(horizontal="center")
+
+    for item in items:
+        ws.append([
+            item.get("part_label", ""), item.get("item_code", ""), item.get("item_name", ""),
+            item.get("lot_no") or "", item.get("expiry_date") or "", item.get("spec") or "",
+            item.get("unit") or "", item.get("reagent_type") or "", item.get("equipment") or "",
+            item.get("vendor") or "", item.get("current_stock", 0), item.get("safety_stock", 0),
+            item.get("hazardous") or "",
+        ])
+
+    col_widths = [16, 14, 40, 16, 12, 16, 8, 14, 18, 18, 10, 10, 14]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    from urllib.parse import quote
+    encoded = quote("시약마스터.xlsx")
+    response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded}"
+    return response
 
 
 @csrf_exempt
@@ -828,7 +948,9 @@ def inbound_bulk_create(request):
     except json.JSONDecodeError:
         return redirect(f"/inbound/?error={quote_plus('선택된 항목 데이터를 읽을 수 없습니다.')}")
 
-    ok, msg = create_bulk_inbound_transactions(rows)
+    created_by = request.user.get_full_name() or request.user.username
+    created_by_empno = getattr(request.user, "profile", None) and request.user.profile.employee_no or ""
+    ok, msg = create_bulk_inbound_transactions(rows, created_by=created_by, created_by_empno=created_by_empno)
     target = "message" if ok else "error"
     return redirect(f"/inbound/?{target}={quote_plus(msg)}")
 
@@ -922,7 +1044,9 @@ def inbound_upload_confirm(request):
     part = request.POST.get("part", "")
     try:
         rows = json.loads(request.POST.get("upload_data", "[]"))
-        ok, msg = create_bulk_inbound_transactions(rows)
+        created_by = request.user.get_full_name() or request.user.username
+        created_by_empno = getattr(request.user, "profile", None) and request.user.profile.employee_no or ""
+        ok, msg = create_bulk_inbound_transactions(rows, created_by=created_by, created_by_empno=created_by_empno)
         context = get_inbound_base_context(q=q, part=part)
         if ok:
             context["message"] = msg
@@ -990,7 +1114,9 @@ def outbound_bulk_create(request):
     except json.JSONDecodeError:
         return redirect(f"/outbound/?error={quote_plus('선택된 항목 데이터를 읽을 수 없습니다.')}")
 
-    ok, msg = create_bulk_outbound_transactions(rows)
+    created_by = request.user.get_full_name() or request.user.username
+    created_by_empno = getattr(request.user, "profile", None) and request.user.profile.employee_no or ""
+    ok, msg = create_bulk_outbound_transactions(rows, created_by=created_by, created_by_empno=created_by_empno)
     target = "message" if ok else "error"
     return redirect(f"/outbound/?{target}={quote_plus(msg)}")
 
@@ -1084,7 +1210,9 @@ def outbound_upload_confirm(request):
     part = request.POST.get("part", "")
     try:
         rows = json.loads(request.POST.get("upload_data", "[]"))
-        ok, msg = create_bulk_outbound_transactions(rows)
+        created_by = request.user.get_full_name() or request.user.username
+        created_by_empno = getattr(request.user, "profile", None) and request.user.profile.employee_no or ""
+        ok, msg = create_bulk_outbound_transactions(rows, created_by=created_by, created_by_empno=created_by_empno)
         context = get_outbound_base_context(q=q, part=part)
         if ok:
             context["message"] = msg
@@ -1104,6 +1232,8 @@ def history_page(request):
     tx_type = request.GET.get("tx_type", "")
     part = _get_part(request)
     q = request.GET.get("q", "")
+    vendor = request.GET.get("vendor", "")
+    reagent_type = request.GET.get("reagent_type", "")
     date_from = request.GET.get("date_from", "")
     date_to = request.GET.get("date_to", "")
     period = request.GET.get("period", "7d")
@@ -1125,18 +1255,228 @@ def history_page(request):
             tx_type=tx_type,
             part=part,
             q=q,
+            vendor=vendor,
+            reagent_type=reagent_type,
             date_from=date_from,
             date_to=date_to,
         ),
         "tx_type": tx_type,
         "part": part,
         "q": q,
+        "vendor": vendor,
+        "reagent_type": reagent_type,
         "date_from": date_from,
         "date_to": date_to,
         "period": period,
         "part_map": get_part_map(get_current_schema()),
+        "vendor_options": get_history_vendor_options(),
+        "reagent_type_options": get_history_reagent_type_options(),
     }
     return render(request, "history.html", context)
+
+
+@login_required
+def history_export(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from urllib.parse import quote
+    from datetime import date, timedelta
+
+    tx_type = request.GET.get("tx_type", "")
+    part = request.GET.get("part", "") or _get_part(request)
+    q = request.GET.get("q", "")
+    vendor = request.GET.get("vendor", "")
+    reagent_type = request.GET.get("reagent_type", "")
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+    period = request.GET.get("period", "7d")
+    today = date.today()
+
+    if not date_from and not date_to:
+        if period == "1m":
+            date_from = (today - timedelta(days=30)).isoformat()
+        elif period == "6m":
+            date_from = (today - timedelta(days=183)).isoformat()
+        else:
+            date_from = (today - timedelta(days=7)).isoformat()
+        date_to = today.isoformat()
+
+    items = get_history_items(tx_type=tx_type, part=part, q=q, vendor=vendor, reagent_type=reagent_type, date_from=date_from, date_to=date_to)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "입출고이력"
+
+    headers = ["거래일", "구분", "파트", "품목코드", "품목명", "Lot No", "업체", "시약구분", "입고수량", "출고수량", "잔여재고", "등록자"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="D9E1F2")
+        cell.alignment = Alignment(horizontal="center")
+
+    for item in items:
+        if item.get("billing_label"):
+            label = item["billing_label"]
+        else:
+            label = item["tx_type_label"]
+        ws.append([
+            item["tx_date"],
+            label,
+            item["part_label"],
+            item["item_code"],
+            item["item_name"],
+            item["lot_no"] or "",
+            item.get("vendor") or "",
+            item.get("reagent_type_label") or "",
+            item["inbound_qty"] or "",
+            item["outbound_qty"] or "",
+            item["remaining_stock"],
+            item["created_by"] or "",
+        ])
+
+    col_widths = [12, 12, 18, 14, 40, 16, 18, 12, 10, 10, 10, 12]
+    for i, width in enumerate(col_widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"입출고이력_{date_from}_{date_to}.xlsx"
+    encoded = quote(filename)
+    response = HttpResponse(
+        buf.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded}"
+    return response
+
+
+@login_required
+def history_billing_type(request):
+    """선택 이력의 billing_type 업데이트 API"""
+    if request.method != "POST":
+        from django.http import JsonResponse
+        return JsonResponse({"ok": False, "error": "method not allowed"}, status=405)
+    from django.http import JsonResponse
+    try:
+        data = json.loads(request.body)
+        ids = [int(i) for i in data.get("ids", [])]
+        new_billing_type = data.get("billing_type")  # None, 'FREE_IN', 'PROV_OUT'
+        if not ids:
+            return JsonResponse({"ok": False, "error": "ids required"})
+
+        from app.services.history_service import recalculate_current_stock
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        placeholders = ",".join(["%s"] * len(ids))
+
+        cursor.execute(
+            f"UPDATE transaction_history SET billing_type = %s WHERE id IN ({placeholders})",
+            [new_billing_type] + ids,
+        )
+        conn.commit()
+        conn.close()
+
+        # billing_type 변경 후 전체 재고 재계산
+        recalculate_current_stock()
+
+        return JsonResponse({"ok": True})
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)})
+
+
+@login_required
+def billing_page(request):
+    from app.services.billing_service import get_billing_items
+    from datetime import date
+
+    today = date.today()
+    month = request.GET.get("month", today.strftime("%Y-%m"))
+    part = _get_part(request)
+
+    items = get_billing_items(month=month, part=part)
+
+    context = {
+        "active_menu": "billing",
+        "items": items,
+        "month": month,
+        "part": part,
+        "part_map": get_part_map(get_current_schema()),
+    }
+    return render(request, "billing.html", context)
+
+
+@login_required
+def billing_export(request):
+    from app.services.billing_service import get_billing_items
+    from datetime import date
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from urllib.parse import quote
+
+    today = date.today()
+    month = request.GET.get("month", today.strftime("%Y-%m"))
+    part = request.GET.get("part", "")
+
+    items = get_billing_items(month=month, part=part)
+    out_items = [i for i in items if i["tx_type"] == "OUT"]
+    in_items  = [i for i in items if i["tx_type"] == "IN"]
+
+    wb = openpyxl.Workbook()
+
+    header_font = Font(bold=True)
+    header_fill = PatternFill("solid", fgColor="D9E1F2")
+    center = Alignment(horizontal="center", vertical="center")
+
+    HEADERS = ["구분", "파트", "품목코드", "품목명", "Lot No", "업체", "수량", "비고"]
+
+    def write_sheet(ws, rows):
+        ws.append(HEADERS)
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center
+
+        for row in rows:
+            ws.append([
+                row["tx_type_label"],
+                row["part_label"],
+                row["item_code"],
+                row["item_name"],
+                row["lot_no"] or "",
+                row["vendor"] or "",
+                row["qty_display"],
+                row["note"] or "",
+            ])
+
+        # 컬럼 너비 자동 조정
+        col_widths = [10, 18, 16, 40, 16, 18, 8, 35]
+        for i, width in enumerate(col_widths, 1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width
+
+    # 출고 시트
+    ws_out = wb.active
+    ws_out.title = "출고"
+    write_sheet(ws_out, out_items)
+
+    # 입고 시트
+    ws_in = wb.create_sheet("입고")
+    write_sheet(ws_in, in_items)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"시약청구_{month}.xlsx"
+    encoded = quote(filename)
+    response = HttpResponse(
+        buf.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded}"
+    return response
 
 
 @login_required
@@ -1187,8 +1527,9 @@ def history_admin_edit(request, record_id):
     tx_type = request.POST.get("tx_type", "").strip()
     tx_date = request.POST.get("tx_date", "").strip()
     qty = int(request.POST.get("qty", 0) or 0)
+    referer = request.META.get("HTTP_REFERER", "/history-admin/")
     if not tx_date or qty <= 0:
-        return redirect("/history-admin/?error=거래일과 수량을 올바르게 입력해 주세요.")
+        return redirect(referer + ("&" if "?" in referer else "?") + "error=거래일과 수량을 올바르게 입력해 주세요.")
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -1197,7 +1538,9 @@ def history_admin_edit(request, record_id):
     )
     conn.commit()
     conn.close()
-    return redirect("/history-admin/?message=수정되었습니다.")
+    from app.services.history_service import recalculate_current_stock
+    recalculate_current_stock()
+    return redirect(referer + ("&" if "?" in referer else "?") + "message=수정되었습니다.")
 
 
 @csrf_exempt
@@ -1206,12 +1549,97 @@ def history_admin_edit(request, record_id):
 def history_admin_delete(request, record_id):
     if request.method != "POST":
         return redirect("history_admin")
+    referer = request.META.get("HTTP_REFERER", "/history-admin/")
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM transaction_history WHERE id = %s", (record_id,))
     conn.commit()
     conn.close()
-    return redirect("/history-admin/?message=삭제되었습니다.")
+    from app.services.history_service import recalculate_current_stock
+    recalculate_current_stock()
+    return redirect(referer + ("&" if "?" in referer else "?") + "message=삭제되었습니다.")
+
+
+@login_required
+@user_passes_test(can_access_admin_area)
+def inventory_admin_page(request):
+    part = request.GET.get("part", "")
+    q = request.GET.get("q", "")
+
+    context = {
+        "active_menu": "admin_panel",
+        "items": get_inventory_items(part=part, q=q),
+        "part": part,
+        "q": q,
+        "part_map": get_part_map(get_current_schema()),
+        "message": request.GET.get("message", ""),
+        "error": request.GET.get("error", ""),
+    }
+    return render(request, "inventory_admin.html", context)
+
+
+@csrf_exempt
+@login_required
+@user_passes_test(can_access_admin_area)
+def inventory_admin_edit(request, item_id):
+    from django.http import JsonResponse
+    from datetime import date
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "method not allowed"}, status=405)
+    new_stock_str = request.POST.get("current_stock", "").strip()
+    if new_stock_str == "" or not new_stock_str.lstrip("-").isdigit():
+        return JsonResponse({"ok": False, "error": "재고 수량을 올바르게 입력해 주세요."}, status=400)
+    new_stock = int(new_stock_str)
+
+    created_by = request.user.get_full_name() or request.user.username
+    created_by_empno = ""
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM inventory WHERE id = %s AND disposed_at IS NULL", (item_id,))
+        row = cursor.fetchone()
+        if not row:
+            return JsonResponse({"ok": False, "error": "항목을 찾을 수 없습니다."}, status=404)
+        item = dict(row)
+        old_stock = int(item.get("current_stock", 0) or 0)
+        delta = new_stock - old_stock
+        if delta == 0:
+            return JsonResponse({"ok": True})
+
+        safety_stock = int(item.get("safety_stock", 0) or 0)
+        required_qty = max(safety_stock - new_stock, 0)
+        tx_type = "IN" if delta > 0 else "OUT"
+        qty = abs(delta)
+        tx_date = date.today().isoformat()
+
+        cursor.execute(
+            "UPDATE inventory SET current_stock = %s, required_qty = %s WHERE id = %s",
+            (new_stock, required_qty, item_id),
+        )
+        cursor.execute(
+            """
+            INSERT INTO transaction_history (
+                inventory_id, tx_type, qty, tx_date, note, remaining_stock,
+                item_code, item_name, lot_no, part, unit,
+                created_by, created_by_empno
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                item_id, tx_type, qty, tx_date, "관리자 재고 수정", new_stock,
+                item.get("item_code", ""), item.get("item_name", ""),
+                item.get("lot_no", ""), item.get("part", ""), item.get("unit", ""),
+                created_by, created_by_empno,
+            ),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+    finally:
+        conn.close()
+
+    return JsonResponse({"ok": True})
 
 
 @login_required
@@ -1285,6 +1713,65 @@ def reagent_history_page(request):
         "filter_options": get_reagent_history_filter_options(),
     }
     return render(request, "reagent_history.html", context)
+
+
+@login_required
+def reagent_history_export(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    part = request.GET.get("part", "")
+    q = request.GET.get("q", "")
+    reagent_type = request.GET.get("reagent_type", "")
+    equipment = request.GET.get("equipment", "")
+    vendor = request.GET.get("vendor", "")
+    hazardous = request.GET.get("hazardous", "")
+    disposed = request.GET.get("disposed", "")
+    sort = request.GET.get("sort", "")
+    order = request.GET.get("order", "")
+
+    items = get_reagent_history_items(
+        part=part, q=q, reagent_type=reagent_type, equipment=equipment,
+        vendor=vendor, hazardous=hazardous, disposed=disposed,
+        sort=sort, order=order,
+    )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "시약이력"
+
+    headers = ["파트", "품목코드", "품목명", "Lot No", "유효기간", "규격", "단위",
+               "시약종류", "장비", "업체", "현재재고", "안전재고", "유해화학물질",
+               "개봉일", "병행사용시작일", "폐기일", "Lot 상태"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="D9E1F2")
+        cell.alignment = Alignment(horizontal="center")
+
+    for item in items:
+        ws.append([
+            item.get("part_label", ""), item.get("item_code", ""), item.get("item_name", ""),
+            item.get("lot_no") or "", item.get("expiry_date") or "", item.get("spec") or "",
+            item.get("unit") or "", item.get("reagent_type") or "", item.get("equipment") or "",
+            item.get("vendor") or "", item.get("current_stock", 0), item.get("safety_stock", 0),
+            item.get("hazardous") or "", item.get("opened_at") or "",
+            item.get("parallel_at") or "", item.get("disposed_at") or "",
+            item.get("lot_status") or "",
+        ])
+
+    col_widths = [16, 14, 40, 16, 12, 16, 8, 14, 18, 18, 10, 10, 14, 12, 14, 12, 12]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    from urllib.parse import quote
+    encoded = quote("시약이력.xlsx")
+    response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded}"
+    return response
 
 
 @csrf_exempt
