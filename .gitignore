@@ -16,6 +16,10 @@ postgres-data/
 # Environment
 .env
 .env.*
+venv/
+
+# Backup
+*.sql
 
 # IDE / OS
 .vscode/
