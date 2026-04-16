@@ -20,7 +20,7 @@ def get_transaction_table_items(tx_type: str, q: str = "", part: str = "", sort:
     query = """
         SELECT
             id, part, item_code, item_name, lot_no, unit,
-            current_stock, safety_stock, expiry_date
+            current_stock, safety_stock, expiry_date, is_new_lot
         FROM inventory
         WHERE disposed_at IS NULL
     """
@@ -56,6 +56,8 @@ def get_transaction_table_items(tx_type: str, q: str = "", part: str = "", sort:
         row["display_name"] = f"{row['item_code']} | {row['item_name']} | Lot {row.get('lot_no', '') or '-'}"
         raw_expiry = str(row.get("expiry_date", "") or "").strip()
         row["expiry_date"] = "" if raw_expiry == "9999-12-31" else raw_expiry[:10]
+        is_new_lot_raw = str(row.get("is_new_lot", "N") or "N").strip()
+        row["is_new_lot"] = "Y" if is_new_lot_raw == "Y" else "N"
         items.append(row)
 
     return items

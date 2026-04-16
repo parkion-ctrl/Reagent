@@ -16,6 +16,7 @@ def get_master_items(
     equipment: str = "",
     vendor: str = "",
     hazardous: str = "",
+    is_new_lot: str = "",
     sort: str = "",
     order: str = "",
 ):
@@ -26,7 +27,7 @@ def get_master_items(
 
     query = """
         SELECT
-            id, hazardous, part, item_code, item_name, lot_no,
+            id, is_new_lot, hazardous, part, item_code, item_name, lot_no,
             expiry_date, spec, unit, reagent_type, equipment,
             vendor, safety_stock, current_stock, required_qty
         FROM inventory
@@ -59,6 +60,10 @@ def get_master_items(
         query += " AND hazardous IN ('1', 'Y', 'y', 'Yes', 'yes', '예', '사용')"
     elif hazardous == "N":
         query += " AND hazardous IN ('0', 'N', 'n', 'No', 'no', '아니오', '무')"
+    if is_new_lot == "Y":
+        query += " AND is_new_lot = 'Y'"
+    elif is_new_lot == "N":
+        query += " AND (is_new_lot IS NULL OR is_new_lot != 'Y')"
 
     allowed_sort = ["item_code", "item_name", "expiry_date", "safety_stock", "current_stock"]
     if sort in allowed_sort:
@@ -92,6 +97,9 @@ def get_master_items(
             row["hazardous"] = "N"
         else:
             row["hazardous"] = hazardous_raw
+
+        is_new_lot_raw = str(row.get("is_new_lot", "N") or "N").strip()
+        row["is_new_lot"] = "Y" if is_new_lot_raw == "Y" else "N"
 
         items.append(row)
 

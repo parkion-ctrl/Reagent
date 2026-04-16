@@ -55,6 +55,7 @@
             <thead>
                 <tr>
                     <th>파트</th>
+                    <th>New Lot</th>
                     <th>품목코드</th>
                     <th>품목명</th>
                     <th>Lot No</th>
@@ -68,6 +69,7 @@
                 {% for item in items %}
                 <tr>
                     <td><span class="part-pill">{{ item.part_label }}</span></td>
+                    <td>{{ item.is_new_lot }}</td>
                     <td>{{ item.item_code }}</td>
                     <td class="text-start item-name-cell expandable" title="{{ item.item_name }}">{{ item.item_name }}</td>
                     <td>{{ item.lot_no }}</td>

@@ -214,6 +214,7 @@ def get_reagent_history_filter_options():
         "vendors": [str(v).strip() for v in vendor_rows if v is not None and str(v).strip()],
         "hazardous_options": [{"value": "Y", "label": "Y"}, {"value": "N", "label": "N"}],
         "disposed_options": [{"value": "Y", "label": "Y"}, {"value": "N", "label": "N"}],
+        "new_lot_options": [{"value": "Y", "label": "Y"}, {"value": "N", "label": "N"}],
     }
 
 
@@ -224,6 +225,7 @@ def get_reagent_history_items(
     equipment: str = "",
     vendor: str = "",
     hazardous: str = "",
+    is_new_lot: str = "",
     disposed: str = "",
     lot_status: str = "",
     sort: str = "",
@@ -236,7 +238,7 @@ def get_reagent_history_items(
 
     query = """
         SELECT
-            id, hazardous, part, item_code, item_name, lot_no,
+            id, hazardous, is_new_lot, part, item_code, item_name, lot_no,
             expiry_date, disposed_at, opened_at, parallel_at,
             base_item_name, lot_status,
             spec, unit, reagent_type, equipment, vendor
@@ -264,6 +266,10 @@ def get_reagent_history_items(
         query += " AND hazardous IN ('1', 'Y', 'y', 'Yes', 'yes', '유', '사용')"
     elif hazardous == "N":
         query += " AND hazardous IN ('0', 'N', 'n', 'No', 'no', '무', '미사용')"
+    if is_new_lot == "Y":
+        query += " AND is_new_lot = 'Y'"
+    elif is_new_lot == "N":
+        query += " AND (is_new_lot IS NULL OR is_new_lot != 'Y')"
     if disposed == "Y":
         query += " AND disposed_at IS NOT NULL"
     elif disposed == "N":
@@ -306,6 +312,8 @@ def get_reagent_history_items(
             str(row.get("reagent_type", "")).strip(),
         )
         row["hazardous"] = normalize_hazardous(row.get("hazardous"))
+        is_new_lot_raw = str(row.get("is_new_lot") or "").strip()
+        row["is_new_lot"] = "Y" if is_new_lot_raw == "Y" else "N"
         row["disposed"] = "Y" if row.get("disposed_at") else "N"
         base_item_name = row.get("base_item_name") or row.get("item_name") or ""
         row["item_name"] = compose_item_name(base_item_name, row.get("lot_status"))

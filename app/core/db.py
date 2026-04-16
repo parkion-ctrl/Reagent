@@ -198,6 +198,7 @@ def _init_schema_tables(schema: str):
     ensure_column(cursor, "inventory", "parallel_at", "parallel_at TEXT")
     ensure_column(cursor, "inventory", "base_item_name", "base_item_name TEXT")
     ensure_column(cursor, "inventory", "lot_status", "lot_status TEXT NOT NULL DEFAULT ''")
+    ensure_column(cursor, "inventory", "is_new_lot", "is_new_lot TEXT NOT NULL DEFAULT 'N'")
     ensure_column(cursor, "transaction_history", "remaining_stock", "remaining_stock INTEGER NOT NULL DEFAULT 0")
     ensure_column(cursor, "transaction_history", "billing_type", "billing_type TEXT")
     ensure_column(cursor, "transaction_history", "created_by", "created_by TEXT NOT NULL DEFAULT ''")
@@ -261,6 +262,7 @@ def init_db():
     ensure_column(cursor, "inventory", "parallel_at", "parallel_at TEXT")
     ensure_column(cursor, "inventory", "base_item_name", "base_item_name TEXT")
     ensure_column(cursor, "inventory", "lot_status", "lot_status TEXT NOT NULL DEFAULT ''")
+    ensure_column(cursor, "inventory", "is_new_lot", "is_new_lot TEXT NOT NULL DEFAULT 'N'")
 
     cursor.execute(
         """

@@ -134,7 +134,8 @@ def get_history_items(
             th.item_code, th.item_name, th.lot_no, th.part, th.unit, th.created_at, th.billing_type,
             th.created_by, th.created_by_empno,
             COALESCE(i.vendor, '') AS vendor,
-            COALESCE(i.reagent_type, '') AS reagent_type
+            COALESCE(i.reagent_type, '') AS reagent_type,
+            COALESCE(i.is_new_lot, 'N') AS is_new_lot
         FROM transaction_history th
         LEFT JOIN inventory i ON i.id = th.inventory_id
         WHERE 1 = 1
@@ -189,6 +190,8 @@ def get_history_items(
         part_name = get_part_map(get_current_schema()).get(part_code, "")
         row["part_label"] = f"{part_code} ({part_name})" if part_name else part_code
         row["tx_type_label"] = "입고" if row["tx_type"] == "IN" else "출고"
+        is_new_lot_raw = str(row.get("is_new_lot", "N") or "N").strip()
+        row["is_new_lot"] = "Y" if is_new_lot_raw == "Y" else "N"
         reagent_type_code = str(row.get("reagent_type", "")).strip()
         row["reagent_type_label"] = REAGENT_TYPE_MAP.get(reagent_type_code, reagent_type_code)
         row["tx_badge_class"] = "text-bg-primary" if row["tx_type"] == "IN" else "text-bg-secondary"

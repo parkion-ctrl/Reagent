@@ -530,6 +530,7 @@ def inventory_page(request):
     equipment = request.GET.get("equipment", "")
     vendor = request.GET.get("vendor", "")
     hazardous = request.GET.get("hazardous", "")
+    is_new_lot = request.GET.get("is_new_lot", "")
     expiry_filter = request.GET.get("expiry_filter", "")
     sort = request.GET.get("sort", "")
     order = request.GET.get("order", "")
@@ -543,6 +544,7 @@ def inventory_page(request):
             equipment=equipment,
             vendor=vendor,
             hazardous=hazardous,
+            is_new_lot=is_new_lot,
             expiry_filter=expiry_filter,
             sort=sort,
             order=order,
@@ -554,6 +556,7 @@ def inventory_page(request):
         "equipment": equipment,
         "vendor": vendor,
         "hazardous": hazardous,
+        "is_new_lot": is_new_lot,
         "expiry_filter": expiry_filter,
         "sort": sort,
         "order": order,
@@ -632,6 +635,7 @@ def master_page(request):
     equipment = request.GET.get("equipment", "")
     vendor = request.GET.get("vendor", "")
     hazardous = request.GET.get("hazardous", "")
+    is_new_lot = request.GET.get("is_new_lot", "")
 
     context = {
         "active_menu": "master",
@@ -642,6 +646,7 @@ def master_page(request):
             equipment=equipment,
             vendor=vendor,
             hazardous=hazardous,
+            is_new_lot=is_new_lot,
             sort=sort,
             order=order,
         ),
@@ -658,6 +663,7 @@ def master_page(request):
         "equipment": equipment,
         "vendor": vendor,
         "hazardous": hazardous,
+        "is_new_lot": is_new_lot,
         "filter_options": get_inventory_filter_options(),
     }
     return render(request, "master.html", context)
@@ -1656,6 +1662,7 @@ def reagent_history_page(request):
     equipment = request.GET.get("equipment", "")
     vendor = request.GET.get("vendor", "")
     hazardous = request.GET.get("hazardous", "")
+    is_new_lot = request.GET.get("is_new_lot", "")
     disposed = request.GET.get("disposed", "")
     show_form = request.GET.get("show_form", "")
     selected_item_id = request.GET.get("selected_item_id", "")
@@ -1673,6 +1680,7 @@ def reagent_history_page(request):
     effective_equipment = "" if manage_part else equipment
     effective_vendor = "" if manage_part else vendor
     effective_hazardous = "" if manage_part else hazardous
+    effective_is_new_lot = "" if manage_part else is_new_lot
     effective_disposed = "" if manage_part else disposed
     effective_lot_status = "NEW" if manage_mode == "new" else ""
 
@@ -1687,6 +1695,7 @@ def reagent_history_page(request):
             equipment=effective_equipment,
             vendor=effective_vendor,
             hazardous=effective_hazardous,
+            is_new_lot=effective_is_new_lot,
             disposed=effective_disposed,
             lot_status=effective_lot_status,
             sort=sort,
@@ -1703,6 +1712,7 @@ def reagent_history_page(request):
         "equipment": equipment,
         "vendor": vendor,
         "hazardous": hazardous,
+        "is_new_lot": is_new_lot,
         "disposed": disposed,
         "show_form": show_form,
         "selected_item_id": selected_item_id,

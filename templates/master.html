@@ -261,6 +261,35 @@
                     <th>
                         <input type="checkbox" id="master-select-all" aria-label="전체 선택">
                     </th>
+                    <th class="filterable-th">
+                        <div class="th-inner">
+                            <span class="{% if is_new_lot %}filter-active-text{% endif %}">New Lot</span>
+                            <button type="button" class="filter-toggle {% if is_new_lot %}active{% endif %}" onclick="toggleFilterMenu(event, 'filter-master-new-lot')">▽</button>
+                        </div>
+                        <div id="filter-master-new-lot" class="filter-menu filter-menu-compact d-none" style="min-width: fit-content; width: fit-content; white-space: nowrap;">
+                            <form method="get" class="filter-form">
+                                <input type="hidden" name="part" value="{{ part }}">
+                                <input type="hidden" name="q" value="{{ q }}">
+                                <input type="hidden" name="show_form" value="{{ show_form }}">
+                                <input type="hidden" name="sort" value="{{ sort }}">
+                                <input type="hidden" name="order" value="{{ order }}">
+                                <input type="hidden" name="reagent_type" value="{{ reagent_type }}">
+                                <input type="hidden" name="equipment" value="{{ equipment }}">
+                                <input type="hidden" name="vendor" value="{{ vendor }}">
+                                <input type="hidden" name="hazardous" value="{{ hazardous }}">
+                                <select name="is_new_lot" class="form-select form-select-sm mb-2" style="width: auto;">
+                                    <option value="">전체</option>
+                                    {% for item in filter_options.new_lot_options %}
+                                    <option value="{{ item.value }}" {% if is_new_lot == item.value %}selected{% endif %}>{{ item.label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="d-flex gap-1" style="width: auto;">
+                                    <button type="submit" class="btn btn-sm btn-primary">적용</button>
+                                    <a href="?part={{ part }}&q={{ q }}&show_form={{ show_form }}&sort={{ sort }}&order={{ order }}&reagent_type={{ reagent_type }}&equipment={{ equipment }}&vendor={{ vendor }}&hazardous={{ hazardous }}" class="btn btn-sm btn-outline-secondary">초기화</a>
+                                </div>
+                            </form>
+                        </div>
+                    </th>
                     <th>파트</th>
                     <th class="filterable-th">
                         <div class="th-inner">
@@ -389,6 +418,7 @@
                     <td>
                         <input type="checkbox" class="master-row-checkbox" value="{{ item.id }}" aria-label="시약 선택">
                     </td>
+                    <td>{{ item.is_new_lot }}</td>
                     <td>
                         <span class="part-pill" {% if item.item_name.endswith(' (New)') %}style="background:#dcfce7 !important; color:#166534 !important; border-color:#86efac !important;"{% endif %}>{{ item.part_label or item.part }}</span>
                     </td>

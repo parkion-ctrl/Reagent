@@ -16,6 +16,7 @@ def get_inventory_items(
     equipment: str = "",
     vendor: str = "",
     hazardous: str = "",
+    is_new_lot: str = "",
     expiry_filter: str = "",
     sort: str = "",
     order: str = "",
@@ -53,6 +54,10 @@ def get_inventory_items(
         query += " AND hazardous IN ('1', 'Y', 'y', 'Yes', 'yes', '예', '사용')"
     elif hazardous == "N":
         query += " AND hazardous IN ('0', 'N', 'n', 'No', 'no', '아니오', '무')"
+    if is_new_lot == "Y":
+        query += " AND is_new_lot = 'Y'"
+    elif is_new_lot == "N":
+        query += " AND (is_new_lot IS NULL OR is_new_lot != 'Y')"
     if expiry_filter == "1w":
         query += " AND expiry_date <= (CURRENT_DATE + INTERVAL '7 days')::date::text"
     elif expiry_filter == "2w":
@@ -111,9 +116,13 @@ def get_inventory_items(
         else:
             hazardous_label = hazardous_raw
 
+        is_new_lot_raw = str(row.get("is_new_lot", "N") or "N").strip()
+        is_new_lot_label = "Y" if is_new_lot_raw == "Y" else "N"
+
         items.append(
             {
                 "id": row["id"],
+                "is_new_lot": is_new_lot_label,
                 "hazardous": hazardous_label,
                 "part": part_code,
                 "part_label": f"{part_code} ({part_name})" if part_name else part_code,
@@ -184,4 +193,5 @@ def get_inventory_filter_options():
         "equipments": equipments,
         "vendors": vendors,
         "hazardous_options": [{"value": "Y", "label": "Y"}, {"value": "N", "label": "N"}],
+        "new_lot_options": [{"value": "Y", "label": "Y"}, {"value": "N", "label": "N"}],
     }

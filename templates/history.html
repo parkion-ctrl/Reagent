@@ -106,6 +106,7 @@
                         </div>
                     </th>
                     <th>파트</th>
+                    <th>New Lot</th>
                     <th>품목코드</th>
                     <th>품목명</th>
                     <th>Lot No</th>
@@ -183,6 +184,7 @@
                     <td>
                         <span class="part-pill" {% if item.item_name.endswith(' (New)') %}style="background:#dcfce7 !important; color:#166534 !important; border-color:#86efac !important;"{% endif %}>{{ item.part_label }}</span>
                     </td>
+                    <td>{{ item.is_new_lot }}</td>
                     <td>{{ item.item_code }}</td>
                     <td class="text-start item-name-cell expandable" title="{{ item.item_name }}" onclick="this.classList.toggle('expanded')" {% if item.item_name.endswith(' (New)') %}style="color:#166534 !important; font-weight:600 !important;"{% endif %}>{{ item.item_name }}</td>
                     <td>{{ item.lot_no }}</td>

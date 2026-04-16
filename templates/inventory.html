@@ -64,6 +64,35 @@
                     <th>파트</th>
                     <th class="filterable-th">
                         <div class="th-inner">
+                            <span class="{% if is_new_lot %}filter-active-text{% endif %}">New Lot</span>
+                            <button type="button" class="filter-toggle {% if is_new_lot %}active{% endif %}" onclick="toggleFilterMenu(event, 'filter-new-lot')">▽</button>
+                        </div>
+                        <div id="filter-new-lot" class="filter-menu filter-menu-compact d-none" style="min-width: fit-content; width: fit-content; white-space: nowrap;">
+                            <form method="get" class="filter-form">
+                                <input type="hidden" name="part" value="{{ part }}">
+                                <input type="hidden" name="q" value="{{ q }}">
+                                <input type="hidden" name="expiry_filter" value="{{ expiry_filter }}">
+                                <input type="hidden" name="reagent_type" value="{{ reagent_type }}">
+                                <input type="hidden" name="equipment" value="{{ equipment }}">
+                                <input type="hidden" name="vendor" value="{{ vendor }}">
+                                <input type="hidden" name="hazardous" value="{{ hazardous }}">
+                                <input type="hidden" name="sort" value="{{ sort }}">
+                                <input type="hidden" name="order" value="{{ order }}">
+                                <select name="is_new_lot" class="form-select form-select-sm mb-2" style="width: auto;">
+                                    <option value="">전체</option>
+                                    {% for item in filter_options.new_lot_options %}
+                                    <option value="{{ item.value }}" {% if is_new_lot == item.value %}selected{% endif %}>{{ item.label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="d-flex gap-1" style="width: auto;">
+                                    <button type="submit" class="btn btn-sm btn-primary">적용</button>
+                                    <a href="?part={{ part }}&q={{ q }}&expiry_filter={{ expiry_filter }}&reagent_type={{ reagent_type }}&equipment={{ equipment }}&vendor={{ vendor }}&hazardous={{ hazardous }}&sort={{ sort }}&order={{ order }}" class="btn btn-sm btn-outline-secondary">초기화</a>
+                                </div>
+                            </form>
+                        </div>
+                    </th>
+                    <th class="filterable-th">
+                        <div class="th-inner">
                             <span class="{% if hazardous %}filter-active-text{% endif %}">유해물질</span>
                             <button type="button" class="filter-toggle" onclick="toggleFilterMenu(event, 'filter-hazardous')">▽</button>
                         </div>
@@ -75,6 +104,7 @@
                                 <input type="hidden" name="reagent_type" value="{{ reagent_type }}">
                                 <input type="hidden" name="equipment" value="{{ equipment }}">
                                 <input type="hidden" name="vendor" value="{{ vendor }}">
+                                <input type="hidden" name="is_new_lot" value="{{ is_new_lot }}">
                                 <input type="hidden" name="sort" value="{{ sort }}">
                                 <input type="hidden" name="order" value="{{ order }}">
                                 <select name="hazardous" class="form-select form-select-sm mb-2" style="width: auto;">
@@ -192,6 +222,7 @@
                     <td>
                         <span class="part-pill" {% if item.item_name.endswith(' (New)') %}style="background:#dcfce7 !important; color:#166534 !important; border-color:#86efac !important;"{% endif %}>{{ item.part_label }}</span>
                     </td>
+                    <td>{{ item.is_new_lot }}</td>
                     <td>{{ item.hazardous }}</td>
                     <td>{{ item.item_code }}</td>
                     <td class="text-start item-name-cell expandable" title="{{ item.item_name }}" {% if item.item_name.endswith(' (New)') %}style="color:#166534 !important; font-weight:600 !important;"{% endif %}>{{ item.item_name }}</td>
