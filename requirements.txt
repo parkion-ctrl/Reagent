@@ -1,6 +1,6 @@
 annotated-types==0.7.0
 asgiref==3.11.1
-Django==6.0.4
+Django>=5.0
 django-ninja==1.6.2
 et_xmlfile==2.0.0
 Jinja2==3.1.6
