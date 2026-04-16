@@ -6,7 +6,7 @@ import pandas as pd
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.hashers import make_password
@@ -495,6 +495,10 @@ def admin_part_delete(request, part_id):
 @login_required
 def root_redirect(request):
     return redirect("login")
+
+
+def health_check(request):
+    return JsonResponse({"status": "ok"})
 
 
 def get_master_base_context():
