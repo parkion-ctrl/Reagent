@@ -169,11 +169,10 @@
         </div>
         <input type="hidden" name="sort" value="{{ sort }}">
         <input type="hidden" name="order" value="{{ order }}">
-        <div class="col-lg-2">
-            <button type="submit" class="btn btn-primary w-100">조회</button>
-        </div>
-        <div class="col-lg-2">
-            <a href="/master" class="btn btn-outline-secondary w-100">초기화</a>
+        <div class="col-lg-4 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary px-4 py-2">조회</button>
+            <a href="/master?part=" class="btn btn-outline-secondary px-4 py-2">초기화</a>
+            <button type="button" class="btn btn-success px-4 py-2" onclick="exportExcel('/master/export')">엑셀</button>
         </div>
     </form>
 </div>

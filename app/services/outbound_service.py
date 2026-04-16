@@ -18,8 +18,8 @@ def preview_bulk_outbound_items(df):
     return preview_bulk_transaction_items(tx_type="OUT", df=df)
 
 
-def create_bulk_outbound_transactions(rows: list[dict]):
-    return confirm_bulk_transaction_items(tx_type="OUT", rows=rows)
+def create_bulk_outbound_transactions(rows: list[dict], created_by: str = "", created_by_empno: str = ""):
+    return confirm_bulk_transaction_items(tx_type="OUT", rows=rows, created_by=created_by, created_by_empno=created_by_empno)
 
 
 def preview_manual_outbound_items(rows: list[dict]):

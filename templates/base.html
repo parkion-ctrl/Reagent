@@ -31,6 +31,10 @@
                 <span class="nav-icon">≡</span>
                 <span>입출고 이력 조회</span>
             </a>
+            <a href="/billing" class="nav-item {% if active_menu == 'billing' %}active{% endif %}">
+                <span class="nav-icon">₩</span>
+                <span>시약 청구</span>
+            </a>
             <a href="/reagent-history" class="nav-item {% if active_menu == 'reagent_history' %}active{% endif %}">
                 <span class="nav-icon">≣</span>
                 <span>시약 이력 조회</span>
@@ -130,6 +134,15 @@ function switchDept(dept) {
     window.location.href = "/set-dept/?dept=" + encodeURIComponent(dept) + "&next=" + next;
 }
 
+
+function exportExcel(baseUrl) {
+    const form = document.querySelector('form');
+    const params = new URLSearchParams(form ? new FormData(form) : {});
+    // FormData는 select/input 값만 가져오므로 현재 URL params도 병합
+    const current = new URLSearchParams(window.location.search);
+    current.forEach((v, k) => { if (!params.has(k)) params.set(k, v); });
+    window.location.href = baseUrl + '?' + params.toString();
+}
 </script>
 </body>
 </html>

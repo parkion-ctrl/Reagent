@@ -199,6 +199,9 @@ def _init_schema_tables(schema: str):
     ensure_column(cursor, "inventory", "base_item_name", "base_item_name TEXT")
     ensure_column(cursor, "inventory", "lot_status", "lot_status TEXT NOT NULL DEFAULT ''")
     ensure_column(cursor, "transaction_history", "remaining_stock", "remaining_stock INTEGER NOT NULL DEFAULT 0")
+    ensure_column(cursor, "transaction_history", "billing_type", "billing_type TEXT")
+    ensure_column(cursor, "transaction_history", "created_by", "created_by TEXT NOT NULL DEFAULT ''")
+    ensure_column(cursor, "transaction_history", "created_by_empno", "created_by_empno TEXT NOT NULL DEFAULT ''")
 
     wrapped.commit()
     wrapped.close()
@@ -280,6 +283,9 @@ def init_db():
     )
 
     ensure_column(cursor, "transaction_history", "remaining_stock", "remaining_stock INTEGER NOT NULL DEFAULT 0")
+    ensure_column(cursor, "transaction_history", "billing_type", "billing_type TEXT")
+    ensure_column(cursor, "transaction_history", "created_by", "created_by TEXT NOT NULL DEFAULT ''")
+    ensure_column(cursor, "transaction_history", "created_by_empno", "created_by_empno TEXT NOT NULL DEFAULT ''")
 
     conn.commit()
     conn.close()

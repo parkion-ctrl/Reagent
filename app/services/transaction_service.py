@@ -61,12 +61,12 @@ def get_transaction_table_items(tx_type: str, q: str = "", part: str = "", sort:
     return items
 
 
-def apply_stock_transaction(tx_type: str, inventory_id: int, qty: int, tx_date: str):
+def apply_stock_transaction(tx_type: str, inventory_id: int, qty: int, tx_date: str, created_by: str = "", created_by_empno: str = ""):
     rows = [{"inventory_id": inventory_id, "qty": qty, "tx_date": tx_date}]
-    return apply_bulk_stock_transactions(tx_type=tx_type, rows=rows)
+    return apply_bulk_stock_transactions(tx_type=tx_type, rows=rows, created_by=created_by, created_by_empno=created_by_empno)
 
 
-def apply_bulk_stock_transactions(tx_type: str, rows: list[dict]):
+def apply_bulk_stock_transactions(tx_type: str, rows: list[dict], created_by: str = "", created_by_empno: str = ""):
     if tx_type not in {"IN", "OUT"}:
         return False, "지원하지 않는 거래 유형입니다."
     if not rows:
@@ -120,9 +120,10 @@ def apply_bulk_stock_transactions(tx_type: str, rows: list[dict]):
                 """
                 INSERT INTO transaction_history (
                     inventory_id, tx_type, qty, tx_date, note, remaining_stock,
-                    item_code, item_name, lot_no, part, unit
+                    item_code, item_name, lot_no, part, unit,
+                    created_by, created_by_empno
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     inventory_id,
@@ -136,6 +137,8 @@ def apply_bulk_stock_transactions(tx_type: str, rows: list[dict]):
                     item.get("lot_no", ""),
                     item.get("part", ""),
                     item.get("unit", ""),
+                    created_by,
+                    created_by_empno,
                 ),
             )
 
@@ -383,7 +386,7 @@ def preview_manual_transaction_items(tx_type: str, rows: list[dict]):
     }
 
 
-def confirm_bulk_transaction_items(tx_type: str, rows: list[dict]):
+def confirm_bulk_transaction_items(tx_type: str, rows: list[dict], created_by: str = "", created_by_empno: str = ""):
     normalized_rows = []
     for row in rows:
         normalized_rows.append(
@@ -393,7 +396,7 @@ def confirm_bulk_transaction_items(tx_type: str, rows: list[dict]):
                 "tx_date": normalize_tx_date(row["tx_date"]),
             }
         )
-    return apply_bulk_stock_transactions(tx_type=tx_type, rows=normalized_rows)
+    return apply_bulk_stock_transactions(tx_type=tx_type, rows=normalized_rows, created_by=created_by, created_by_empno=created_by_empno)
 
 
 def find_inventory_row(cursor, tx_type: str, item_code: str, lot_no: str):

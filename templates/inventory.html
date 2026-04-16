@@ -48,11 +48,10 @@
                 <option value="4w" {% if expiry_filter == "4w" %}selected{% endif %}>4주 이내</option>
             </select>
         </div>
-        <div class="col-lg-2 d-grid">
-            <button type="submit" class="btn btn-primary custom-btn">조회</button>
-        </div>
-        <div class="col-lg-2 d-grid">
-            <a href="/inventory" class="btn btn-outline-secondary custom-btn">초기화</a>
+        <div class="col-lg-4 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary px-4 py-2">조회</button>
+            <a href="/inventory?part=" class="btn btn-outline-secondary px-4 py-2">초기화</a>
+            <button type="button" class="btn btn-success px-4 py-2" onclick="exportExcel('/inventory/export')">엑셀</button>
         </div>
     </form>
 </div>
